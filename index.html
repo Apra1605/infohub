@@ -1,213 +1,153 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI Webpage Generator (Gemini)</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <script defer src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gemini Background Report Generator</title>
   <style>
-    :root{color-scheme: light dark}
-    html,body{height:100%}
-    body{font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;}
-    .glass{backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px)}
-    .scrollbar::-webkit-scrollbar{height:10px;width:10px}
-    .scrollbar::-webkit-scrollbar-thumb{background:rgba(0,0,0,.2);border-radius:9999px}
-    .code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 0;
+      color: #111;
+    }
+    header {
+      background: #1f2937;
+      color: #fff;
+      padding: 1rem 2rem;
+      font-size: 1.5rem;
+    }
+    main {
+      padding: 2rem;
+      max-width: 900px;
+      margin: auto;
+    }
+    .input-area {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 0.75rem;
+      border: 1px solid #ccc;
+      border-radius: 0.5rem;
+      font-size: 1rem;
+    }
+    button {
+      padding: 0.75rem 1.25rem;
+      border: none;
+      border-radius: 0.5rem;
+      background: #2563eb;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #9ca3af;
+    }
+    pre#output {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: monospace;
+      font-size: 0.9rem;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .status {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: #555;
+    }
   </style>
 </head>
-<body class="bg-gradient-to-br from-slate-50 to-slate-100 text-slate-900 dark:from-slate-900 dark:to-slate-950 dark:text-slate-100 min-h-screen">
-  <header class="sticky top-0 z-40 border-b border-slate-200/60 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/60 glass">
-    <div class="mx-auto max-w-6xl px-4 py-4 flex items-center gap-3">
-      <div class="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 shadow-lg"></div>
-      <div class="flex-1">
-        <h1 class="text-xl font-bold tracking-tight">AI Webpage Generator</h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400">Type a topic → Gemini returns a complete, well‑structured HTML page.</p>
-      </div>
+<body>
+  <header>Gemini Background Report Generator</header>
+  <main>
+    <div class="input-area">
+      <input type="text" id="query" placeholder="Enter a name, topic, or query..." />
+      <button id="generate">Generate</button>
     </div>
-  </header>
-
-  <main class="mx-auto max-w-6xl px-4 py-6 grid gap-6">
-    <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 p-4 glass">
-      <div class="flex flex-col md:flex-row gap-3">
-        <input id="query" class="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g., Detailed profile of Albert Einstein including timeline, quick facts, images, and sources" />
-        <button id="generate" class="rounded-xl bg-gradient-to-br from-indigo-600 to-fuchsia-600 text-white font-semibold px-5 py-3 shadow hover:shadow-md active:scale-[.99]">Generate Webpage</button>
-      </div>
-      <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-        <span class="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">Shift + Enter to submit</span>
-        <span id="status" class="hidden"></span>
-      </div>
-    </div>
-
-    <div class="grid md:grid-cols-3 gap-6">
-      <section class="md:col-span-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 p-0 overflow-hidden glass">
-        <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-          <h2 class="font-semibold">Generated Page Preview</h2>
-          <div class="flex items-center gap-2">
-            <button id="openNew" class="text-sm rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800">Open in new tab</button>
-            <button id="downloadHtml" class="text-sm rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-3 py-1.5">Download HTML</button>
-          </div>
-        </div>
-        <iframe id="preview" class="w-full h-[80vh] bg-white" sandbox="allow-forms allow-pointer-lock allow-same-origin allow-popups-to-escape-sandbox"></iframe>
-      </section>
-    </div>
+    <div class="status" id="status">Idle</div>
+    <pre id="output"></pre>
   </main>
 
-  <template id="basePrompt">
-Return ONLY a complete, self-contained HTML document (no markdown, no explanation) for the topic below. Requirements:
-
-1) Design the page like a **modern investigative profile dashboard** (think police background search page). Use clean, semantic HTML5 with header, nav (table of contents), main sections with anchors, sidebars, and a footer.
-2) Layout should use card/box elements for quick facts, personal info, statistics, and important highlights.
-3) Include relevant images with descriptive alt text and <figcaption>. Favor public-domain/Wikimedia images when possible and cite sources (link under each figure and in a “Sources” section).
-4) Organize content with sections such as: Hero/Overview, Quick Facts cards, Timeline, Notable Achievements, Associated People/Places, and a detailed Sources section.
-5) Include an internal “Back to top” link, sticky table of contents, and smooth scrolling.
-6) Style inline with <style> (no external CSS). Use a light background, bold section headers, large readable text, card-style boxes with shadows, and responsive grid layouts.
-7) DO NOT include <script> tags. All interactivity (like TOC highlighting) should be CSS-only.
-8) All links should open in a new tab (target="_blank" rel="noopener").
-9) Write clear, concise, and comprehensive content. Be as detailed as possible. If uncertain, say so transparently.
-
-TOPIC:
-  </template>
-
   <script>
-    // --- Config ---
-    const GEMINI_API_KEY = "AIzaSyBELzK5j4T6kss4ZQSz4OLB7OLX-Bo_WO4"; // Replace locally with your actual key
+    const GEMINI_API_KEY = "AIzaSyBELzK5j4T6kss4ZQSz4OLB7OLX-Bo_WO4"; // Replace with your key locally
     const GEMINI_MODEL = "gemini-2.0-flash";
 
-    const $ = (sel, root=document) => root.querySelector(sel);
-    const statusEl = $('#status');
-    const preview = $('#preview');
+    const statusEl = document.getElementById('status');
+    const outputEl = document.getElementById('output');
 
-    // Submit with Shift+Enter
-    $('#query').addEventListener('keydown', (e)=>{
-      if(e.key==='Enter' && e.shiftKey){
-        e.preventDefault();
-        generate();
-      }
-    });
-
-    $('#generate').addEventListener('click', generate);
-
-    function buildPrompt(userQuery){
-      const base = document.getElementById('basePrompt').innerHTML.trim();
-      return `${base}\n${userQuery.trim()}`;
+    function setStatus(msg) {
+      statusEl.textContent = msg;
     }
 
-    async function generate(){
-      const q = $('#query').value.trim();
-      if(!q) return toast('Please enter a topic');
-      if(!GEMINI_API_KEY) return toast('API key missing in code');
+    function buildPrompt(query) {
+      return `You are an expert report generator. The user query is: "${query}".
+Return a single complete HTML5 document (with <!DOCTYPE html>, <html>, <head>, and <body> tags) styled like a professional police background search report. Use clean CSS inside <style>.
+Organize the information into structured boxes, tables, and sections (e.g. Profile, History, Records, Media, References). Use placeholder images if none are available. Do not add explanations outside the HTML.`;
+    }
 
-      setStatus('Generating…');
-      setBusy(true);
-      try{
+    function getFirstText(data) {
+      try {
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      } catch (e) {
+        console.error('Error extracting text:', e, data);
+        return null;
+      }
+    }
+
+    function stripCodeFences(text) {
+      return text.replace(/```(html)?/gi, '').trim();
+    }
+
+    document.getElementById('generate').addEventListener('click', async () => {
+      const q = document.getElementById('query').value.trim();
+      if (!q) return alert('Enter a query first');
+      if (!GEMINI_API_KEY) return alert('Please add your API key into the code');
+
+      setStatus('Sending request...');
+      outputEl.textContent = '';
+      try {
         const body = {
-          contents: [{role: 'user', parts: [{text: buildPrompt(q)}]}],
-          generationConfig: {
-            temperature: 0.6,
-            topP: 0.9,
-            topK: 32,
-            maxOutputTokens: 6000
-          }
+          contents: [{ role: 'user', parts: [{ text: buildPrompt(q) }] }],
+          generationConfig: { maxOutputTokens: 7000 }
         };
 
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(body)
-        });
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          }
+        );
 
-        if(!res.ok){
-          const msg = await res.text();
-          throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status} ${res.statusText}: ${errText}`);
         }
 
         const data = await res.json();
-        const text = getFirstText(data) || '';
-        if(!text) throw new Error('Empty response from model');
+        console.log('Raw response:', data);
+        const text = getFirstText(data);
+        if (!text) throw new Error('Empty response from Gemini');
 
         const htmlRaw = stripCodeFences(text);
-        const safeHtml = sanitizeHTML(htmlRaw);
-        renderInIframe(safeHtml);
+        outputEl.textContent = htmlRaw;
         setStatus('Done');
-      }catch(err){
-        console.error(err);
+      } catch (err) {
+        console.error('Error during generation:', err);
+        outputEl.textContent = 'Error: ' + (err?.message || err);
         setStatus('Error');
-        alert('Generation failed:\n' + (err?.message || err));
-      }finally{
-        setBusy(false);
       }
-    }
-
-    function getFirstText(data){
-      try{
-        const cand = data.candidates?.[0];
-        const parts = cand?.content?.parts || [];
-        return parts.map(p=>p.text).filter(Boolean).join('\n');
-      }catch{ return ''; }
-    }
-
-    function stripCodeFences(t){
-      return t.replace(/^```[a-zA-Z]*\n([\s\S]*?)\n```\s*$/m, '$1').replace(/^```[\s\S]*?```/m, (m)=> m.replace(/^```[a-zA-Z]*\n|\n```$/g,''));
-    }
-
-    function sanitizeHTML(html){
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      doc.querySelectorAll('script').forEach(s=>s.remove());
-      const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_ELEMENT);
-      let node; 
-      while((node = walker.nextNode())){
-        [...node.attributes].forEach(attr=>{
-          if(/^on/i.test(attr.name)) node.removeAttribute(attr.name);
-          if(attr.name === 'srcdoc') node.removeAttribute('srcdoc');
-        });
-        if(node.tagName === 'A'){
-          node.setAttribute('target','_blank');
-          node.setAttribute('rel','noopener');
-        }
-      }
-      if(doc.querySelector('html')){
-        return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
-      } else {
-        const body = doc.body.innerHTML;
-        return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Generated Page</title></head><body>${body}</body></html>`;
-      }
-    }
-
-    function renderInIframe(html){
-      const blob = new Blob([html], {type:'text/html'});
-      const url = URL.createObjectURL(blob);
-      preview.src = url;
-      preview.onload = ()=> URL.revokeObjectURL(url);
-      $('#openNew').onclick = ()=> window.open(url, '_blank');
-      $('#downloadHtml').onclick = ()=>{
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `generated-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.html`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      };
-    }
-
-    function setBusy(b){
-      $('#generate').disabled = b;
-      $('#generate').classList.toggle('opacity-60', b);
-    }
-    function setStatus(t){
-      statusEl.textContent = t;
-      statusEl.classList.toggle('hidden', !t);
-    }
-    function toast(msg){
-      const el = document.createElement('div');
-      el.textContent = msg;
-      el.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-lg';
-      document.body.appendChild(el);
-      setTimeout(()=> el.remove(), 2200);
-    }
+    });
   </script>
 </body>
 </html>
