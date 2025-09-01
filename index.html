@@ -84,7 +84,7 @@
   </div>
 
   <script>
-    const GEMINI_API_KEY = "AIzaSyBELzK5j4T6kss4ZQSz4OLB7OLX-Bo_WO4"; // Replace locally
+    const GEMINI_API_KEY = "AIzaSyDtkfMLw-k9-Evqy_ncEin8n0xel1eu1cE"; // Your API key
     const GEMINI_MODEL = "gemini-2.0-flash";
 
     const statusEl = document.getElementById('status');
@@ -101,15 +101,20 @@
     }
 
     function buildPrompt(query) {
-      return `You are an assistant that outputs ONLY a complete, valid HTML5 document. 
-The page must look like a professional police background search report with modern styling, 
-structured boxes, tables, and images if relevant. Include as much detailed, organized information 
-about the topic as possible. First, get all the information that is possible to get about that query, then work on the page. The page must have all the information gathered about the query!
-The HTML must be self-contained with inline CSS, no external links.` + "\n\nQuery: " + query;
+      return `You are an assistant that must output ONLY a complete, valid HTML5 document.
+The HTML must be self-contained with inline CSS, no external links or markdown fences.
+It must look like a professional police background search report with modern styling,
+structured boxes, tables, and images if relevant. 
+Gather as much detailed, organized information about the query as possible and present it 
+inside this HTML page. Do not include explanations, markdown, or anything else — ONLY the HTML code.
+
+Query: ${query}`;
     }
 
     function stripCodeFences(text) {
-      return text.replace(/^```(?:html)?/i, '').replace(/```$/, '').trim();
+      return text.replace(/^\s*```(?:html)?/i, '')
+                 .replace(/```\s*$/i, '')
+                 .trim();
     }
 
     function getFirstText(data) {
@@ -129,7 +134,7 @@ The HTML must be self-contained with inline CSS, no external links.` + "\n\nQuer
       try {
         const body = {
           contents: [{ role: 'user', parts: [{ text: buildPrompt(q) }] }],
-          generationConfig: { temperature: 0.6, maxOutputTokens: 6000 }
+          generationConfig: { temperature: 0.5, maxOutputTokens: 6000 }
         };
 
         const res = await fetch(
@@ -151,6 +156,7 @@ The HTML must be self-contained with inline CSS, no external links.` + "\n\nQuer
         const data = await res.json();
         console.log('Full Gemini response:', data);
         const text = getFirstText(data);
+
         if (!text) {
           logError('Empty response text from Gemini.');
           setStatus('Error');
