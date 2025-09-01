@@ -72,7 +72,6 @@
       max-height: 200px;
       overflow-y: auto;
     }
-    /* --- Loader Animation --- */
     .loader {
       display: none;
       margin: 1rem auto;
@@ -83,10 +82,7 @@
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    /* --- Popup Button --- */
+    @keyframes spin { to { transform: rotate(360deg); } }
     .popup-btn {
       position: fixed;
       bottom: 20px;
@@ -104,10 +100,7 @@
       z-index: 999;
       transition: transform 0.2s;
     }
-    .popup-btn:hover {
-      transform: scale(1.1);
-    }
-    /* --- Side Query Bar --- */
+    .popup-btn:hover { transform: scale(1.1); }
     .side-bar {
       position: fixed;
       top: 0;
@@ -122,22 +115,10 @@
       transition: right 0.4s ease;
       z-index: 998;
     }
-    .side-bar.open {
-      right: 0;
-    }
-    .side-bar h2 {
-      color: #fbbf24;
-      font-size: 1.2rem;
-      margin-bottom: 1rem;
-    }
-    .side-bar textarea {
-      flex-grow: 1;
-      resize: none;
-      margin-bottom: 0.75rem;
-    }
-    .side-bar button {
-      margin-top: auto;
-    }
+    .side-bar.open { right: 0; }
+    .side-bar h2 { color: #fbbf24; font-size: 1.2rem; margin-bottom: 1rem; }
+    .side-bar textarea { flex-grow: 1; resize: none; margin-bottom: 0.75rem; }
+    .side-bar button { margin-top: auto; }
     .side-bar .response {
       margin-top: 1rem;
       padding: 0.75rem;
@@ -160,8 +141,9 @@
   </div>
 
   <script>
-    const GEMINI_API_KEY = "AIzaSyDtkfMLw-k9-Evqy_ncEin8n0xel1eu1cE"; 
+    const GEMINI_API_KEY = "AIzaSyDtkfMLw-k9-Evqy_ncEin8n0xel1eu1cE";
     const GEMINI_MODEL = "gemini-2.0-flash";
+    const SERPAPI_KEY = "YOUR_SERPAPI_KEY"; // 🔑 Put your SerpAPI key here
 
     const statusEl = document.getElementById('status');
     const errorLog = document.getElementById('errorLog');
@@ -169,17 +151,26 @@
 
     let lastReportHTML = "";
 
-    function setStatus(msg) {
-      statusEl.textContent = msg;
-    }
-
+    function setStatus(msg) { statusEl.textContent = msg; }
     function logError(msg) {
       console.error(msg);
       errorLog.style.display = 'block';
       errorLog.textContent += `\n${msg}`;
     }
 
-    function buildPrompt(query) {
+    async function fetchSearchResults(query) {
+      try {
+        const res = await fetch(`https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${SERPAPI_KEY}`);
+        if (!res.ok) throw new Error("Search API error: " + res.status);
+        const data = await res.json();
+        return data.organic_results?.map(r => `- ${r.title}: ${r.snippet || ""} (URL: ${r.link})`).join("\n") || "No results.";
+      } catch (e) {
+        logError("Search error: " + e.message);
+        return "No results (search failed).";
+      }
+    }
+
+    function buildPrompt(query, searchResults) {
       return `You are an assistant that must output ONLY a complete, valid HTML5 document. The HTML must be self-contained with inline CSS, no external links or markdown fences.
       It must look like a professional police background search report with modern styling, structured boxes, tables, and images if relevant. Information needs to be exact.
       Use paragraphs a lot for more information (still organized). Do not generalize! Unknown information should be intently researched. The information should be a lot!!!
@@ -187,7 +178,10 @@
       Inaccurate information will not be tolerated! After getting the information or generating the code for the website, double-check the code and information for placeholders and false information.
       Do not include explanations, markdown, or anything else — ONLY the HTML code.
 
-Query: ${query}`;
+Query: ${query}
+
+Web Search Results:
+${searchResults}`;
     }
 
     function buildFollowUpPrompt(query) {
@@ -217,10 +211,13 @@ ${query}`;
       errorLog.style.display = 'none';
       errorLog.textContent = '';
       loader.style.display = 'block';
-      setStatus('Generating...');
+      setStatus('Searching...');
 
       try {
-        const body = { contents: [{ role: 'user', parts: [{ text: buildPrompt(q) }] }],
+        const searchResults = await fetchSearchResults(q);
+
+        setStatus('Generating...');
+        const body = { contents: [{ role: 'user', parts: [{ text: buildPrompt(q, searchResults) }] }],
                        generationConfig: { temperature: 0.5, maxOutputTokens: 6000 } };
 
         const res = await fetch(
@@ -231,12 +228,11 @@ ${query}`;
         if (!res.ok) { logError(await res.text()); setStatus('Error'); loader.style.display='none'; return; }
 
         const data = await res.json();
-        console.log('Full Gemini response:', data);
         const text = getFirstText(data);
         if (!text) { logError('Empty response text.'); setStatus('Error'); loader.style.display='none'; return; }
 
         const htmlRaw = stripCodeFences(text);
-        lastReportHTML = htmlRaw; // save context
+        lastReportHTML = htmlRaw;
         const blob = new Blob([htmlRaw + popupTemplate()], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
