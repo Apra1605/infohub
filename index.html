@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Webpage Generator (Gemini)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script defer src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{color-scheme: light dark}
+    html,body{height:100%}
+    body{font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;}
+    .glass{backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px)}
+    .scrollbar::-webkit-scrollbar{height:10px;width:10px}
+    .scrollbar::-webkit-scrollbar-thumb{background:rgba(0,0,0,.2);border-radius:9999px}
+    .code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100 text-slate-900 dark:from-slate-900 dark:to-slate-950 dark:text-slate-100 min-h-screen">
+  <header class="sticky top-0 z-40 border-b border-slate-200/60 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/60 glass">
+    <div class="mx-auto max-w-6xl px-4 py-4 flex items-center gap-3">
+      <div class="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-fuchsia-500 shadow-lg"></div>
+      <div class="flex-1">
+        <h1 class="text-xl font-bold tracking-tight">AI Webpage Generator</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Type a topic → Gemini returns a complete, well‑structured HTML page.</p>
+      </div>
+      <button id="toggleSettings" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">
+        <span>Settings</span>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 opacity-70"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37-.54.886-.065 2.037 1.066 2.573 1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.886.54 2.037.065 2.573-1.066Z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Settings Panel -->
+  <section id="settingsPanel" class="hidden border-b border-slate-200/60 dark:border-slate-800/80 bg-white/60 dark:bg-slate-900/50 glass">
+    <div class="mx-auto max-w-6xl px-4 py-4 grid gap-4 md:grid-cols-3">
+      <div class="md:col-span-2 space-y-3">
+        <label class="block text-sm font-medium">Google Gemini API Key</label>
+        <input id="apiKey" type="password" placeholder="AIza..." class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/70 dark:bg-slate-900/70 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <p class="text-xs text-slate-500 dark:text-slate-400">Your key is stored locally in this browser (localStorage). You can create a key in Google AI Studio. Never hard‑code keys in public sites.</p>
+      </div>
+      <div class="space-y-3">
+        <label class="block text-sm font-medium">Model</label>
+        <select id="model" class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white/70 dark:bg-slate-900/70 px-3 py-2">
+          <option value="gemini-1.5-flash">gemini-1.5-flash (fast)</option>
+          <option value="gemini-1.5-pro">gemini-1.5-pro (stronger)</option>
+        </select>
+        <label class="block text-sm font-medium">Output options</label>
+        <div class="flex items-center gap-2 text-sm">
+          <input id="allowScripts" type="checkbox" class="scale-110">
+          <span>Allow scripts inside generated HTML (unsafe)</span>
+        </div>
+        <button id="saveSettings" class="mt-2 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-semibold px-3 py-2">Save Settings</button>
+      </div>
+    </div>
+  </section>
+
+  <main class="mx-auto max-w-6xl px-4 py-6 grid gap-6">
+    <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 p-4 glass">
+      <div class="flex flex-col md:flex-row gap-3">
+        <input id="query" class="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="e.g., The Apollo 11 mission timeline, key facts, sources, and images" />
+        <button id="generate" class="rounded-xl bg-gradient-to-br from-indigo-600 to-fuchsia-600 text-white font-semibold px-5 py-3 shadow hover:shadow-md active:scale-[.99]">Generate Webpage</button>
+      </div>
+      <div class="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+        <span class="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700">Shift + Enter to submit</span>
+        <span id="status" class="hidden"></span>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6">
+      <section class="md:col-span-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 p-0 overflow-hidden glass">
+        <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+          <h2 class="font-semibold">Generated Page Preview</h2>
+          <div class="flex items-center gap-2">
+            <button id="openNew" class="text-sm rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800">Open in new tab</button>
+            <button id="downloadHtml" class="text-sm rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-3 py-1.5">Download HTML</button>
+          </div>
+        </div>
+        <iframe id="preview" class="w-full h-[70vh] bg-white" sandbox="allow-forms allow-pointer-lock allow-same-origin allow-popups-to-escape-sandbox"></iframe>
+      </section>
+
+      <aside class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-900/60 p-4 glass space-y-4">
+        <h3 class="font-semibold">Tips</h3>
+        <ul class="list-disc pl-5 text-sm leading-6 text-slate-600 dark:text-slate-300">
+          <li>Add phrases like <span class="code">“return a glossy dashboard layout with cards and a sticky table of contents”</span>.</li>
+          <li>Ask for <span class="code">“semantic HTML5 sections, accessible alt text, figure captions, and sources”</span>.</li>
+          <li>For images, include <span class="code">“use public-domain or Wikimedia images and include attributions”</span>.</li>
+          <li>Toggle <span class="code">Allow scripts</span> only if you trust the output.</li>
+        </ul>
+      </aside>
+    </div>
+  </main>
+
+  <template id="basePrompt">
+Return ONLY a complete, self-contained HTML document (no markdown, no explanation) for the topic below. Requirements:
+
+1) Use clean, semantic HTML5 with a clear information architecture: header, nav (table of contents), main sections with anchors, aside for key facts, and a footer.
+2) Include a tasteful, modern style using CSS in a <style> block (no external CSS). Prefer a light background, large headings, generous spacing, and responsive grid/card layouts.
+3) Include relevant images with descriptive alt text and <figcaption>. Favor public-domain/Wikimedia images when possible and cite sources (link under each figure and in a “Sources” section).
+4) Use organized components: hero section, quick facts cards, timelines or tables when appropriate, callouts for definitions, and a final FAQ.
+5) Include an internal “Back to top” link, sticky table of contents, and smooth scrolling.
+6) Absolutely DO NOT include <script> tags. If interactivity is needed, use pure CSS where reasonable.
+7) All links should open in a new tab (target="_blank" rel="noopener").
+8) Write clear, concise, and comprehensive content. Assume the reader is smart and curious but unfamiliar with the topic. Avoid hallucinating—if unsure, state that clearly.
+
+TOPIC:
+  </template>
+
+  <script>
+    // --- Local persistence ---
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const settingsPanel = $('#settingsPanel');
+    const statusEl = $('#status');
+    const preview = $('#preview');
+
+    const state = {
+      apiKey: localStorage.getItem('gemini_api_key') || '',
+      model: localStorage.getItem('gemini_model') || 'gemini-1.5-flash',
+      allowScripts: localStorage.getItem('allow_scripts') === 'true'
+    };
+
+    // Initialize settings UI
+    $('#apiKey').value = state.apiKey;
+    $('#model').value = state.model;
+    $('#allowScripts').checked = state.allowScripts;
+
+    $('#toggleSettings').addEventListener('click',()=>{
+      settingsPanel.classList.toggle('hidden');
+    });
+    $('#saveSettings').addEventListener('click',()=>{
+      state.apiKey = $('#apiKey').value.trim();
+      state.model = $('#model').value;
+      state.allowScripts = $('#allowScripts').checked;
+      localStorage.setItem('gemini_api_key', state.apiKey);
+      localStorage.setItem('gemini_model', state.model);
+      localStorage.setItem('allow_scripts', String(state.allowScripts));
+      toast('Settings saved');
+    });
+
+    // Submit with Shift+Enter
+    $('#query').addEventListener('keydown', (e)=>{
+      if(e.key==='Enter' && e.shiftKey){
+        e.preventDefault();
+        generate();
+      }
+    });
+
+    $('#generate').addEventListener('click', generate);
+
+    // --- Core: build prompt, call Gemini, render ---
+    function buildPrompt(userQuery){
+      const base = document.getElementById('basePrompt').innerHTML.trim();
+      return `${base}\n${userQuery.trim()}`;
+    }
+
+    async function generate(){
+      const q = $('#query').value.trim();
+      if(!q) return toast('Please enter a topic');
+      if(!state.apiKey) return toast('Add your Gemini API key in Settings');
+
+      setStatus('Generating…');
+      setBusy(true);
+      try{
+        const body = {
+          contents: [{role: 'user', parts: [{text: buildPrompt(q)}]}],
+          generationConfig: {
+            temperature: 0.6,
+            topP: 0.9,
+            topK: 32,
+            maxOutputTokens: 6000
+          }
+        };
+
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(state.model)}:generateContent?key=${encodeURIComponent(state.apiKey)}`,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(body)
+        });
+
+        if(!res.ok){
+          const msg = await res.text();
+          throw new Error(`${res.status} ${res.statusText}: ${msg}`);
+        }
+
+        const data = await res.json();
+        const text = getFirstText(data) || '';
+        if(!text) throw new Error('Empty response from model');
+
+        // Strip markdown fences if present
+        const htmlRaw = stripCodeFences(text);
+        const safeHtml = state.allowScripts ? htmlRaw : sanitizeHTML(htmlRaw);
+        renderInIframe(safeHtml);
+        setStatus('Done');
+      }catch(err){
+        console.error(err);
+        setStatus('Error');
+        alert('Generation failed:\n' + (err?.message || err));
+      }finally{
+        setBusy(false);
+      }
+    }
+
+    function getFirstText(data){
+      try{
+        const cand = data.candidates?.[0];
+        const parts = cand?.content?.parts || [];
+        const txt = parts.map(p=>p.text).filter(Boolean).join('\n');
+        return txt;
+      }catch{ return ''; }
+    }
+
+    function stripCodeFences(t){
+      // Remove ```html ... ``` or ``` ... ``` wrappers
+      return t
+        .replace(/^```[a-zA-Z]*\n([\s\S]*?)\n```\s*$/m, '$1')
+        .replace(/^```[\s\S]*?```/m, (m)=> m.replace(/^```[a-zA-Z]*\n|\n```$/g,''));
+    }
+
+    function sanitizeHTML(html){
+      // Remove <script> tags and on* event attributes
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+
+      // Remove scripts
+      doc.querySelectorAll('script').forEach(s=>s.remove());
+
+      // Remove event handler attributes (on*)
+      const walker = doc.createTreeWalker(doc, NodeFilter.SHOW_ELEMENT);
+      let node; 
+      while((node = walker.nextNode())){
+        [...node.attributes].forEach(attr=>{
+          if(/^on/i.test(attr.name)) node.removeAttribute(attr.name);
+          if(attr.name === 'srcdoc') node.removeAttribute('srcdoc');
+        });
+
+        // Force external links to open safely
+        if(node.tagName === 'A'){
+          node.setAttribute('target','_blank');
+          node.setAttribute('rel','noopener');
+        }
+      }
+
+      // Return serialized document (keep only body contents if full doc not needed)
+      // If the model returned a full document, preserve it. Else wrap into a minimal shell.
+      if(doc.querySelector('html')){
+        return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
+      } else {
+        const body = doc.body.innerHTML;
+        return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">`+
+               `<title>Generated Page</title></head><body>${body}</body></html>`;
+      }
+    }
+
+    function renderInIframe(html){
+      const blob = new Blob([html], {type:'text/html'});
+      const url = URL.createObjectURL(blob);
+      preview.src = url;
+      preview.onload = ()=> URL.revokeObjectURL(url);
+      // Wire up actions
+      $('#openNew').onclick = ()=> window.open(url, '_blank');
+      $('#downloadHtml').onclick = ()=>{
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `generated-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.html`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      };
+    }
+
+    function setBusy(b){
+      $('#generate').disabled = b;
+      $('#generate').classList.toggle('opacity-60', b);
+    }
+    function setStatus(t){
+      statusEl.textContent = t;
+      statusEl.classList.toggle('hidden', !t);
+    }
+    function toast(msg){
+      const el = document.createElement('div');
+      el.textContent = msg;
+      el.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-lg';
+      document.body.appendChild(el);
+      setTimeout(()=> el.remove(), 2200);
+    }
+
+  </script>
+</body>
+</html>
