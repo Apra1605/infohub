@@ -3,121 +3,133 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gemini Background Report Generator</title>
+  <title>Gemini Report Generator</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background: #f3f4f6;
       margin: 0;
-      padding: 0;
-      color: #111;
-    }
-    header {
-      background: #1f2937;
-      color: #fff;
-      padding: 1rem 2rem;
-      font-size: 1.5rem;
-    }
-    main {
-      padding: 2rem;
-      max-width: 900px;
-      margin: auto;
-    }
-    .input-area {
+      font-family: 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1f2937, #111827);
+      color: #f9fafb;
+      min-height: 100vh;
       display: flex;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
     }
-    input[type="text"] {
-      flex: 1;
-      padding: 0.75rem;
-      border: 1px solid #ccc;
-      border-radius: 0.5rem;
+    .container {
+      background: #1f2937;
+      padding: 2rem;
+      border-radius: 1rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      width: 100%;
+      max-width: 600px;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 1rem;
+      font-size: 1.75rem;
+      color: #fbbf24;
+    }
+    textarea {
+      width: 100%;
+      height: 120px;
+      padding: 1rem;
+      border-radius: 0.75rem;
+      border: none;
+      resize: vertical;
       font-size: 1rem;
+      margin-bottom: 1rem;
+      outline: none;
     }
     button {
-      padding: 0.75rem 1.25rem;
+      background: #fbbf24;
+      color: #111827;
+      font-weight: bold;
       border: none;
-      border-radius: 0.5rem;
-      background: #2563eb;
-      color: white;
-      font-size: 1rem;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
       cursor: pointer;
+      font-size: 1rem;
+      transition: background 0.2s;
     }
-    button:disabled {
-      background: #9ca3af;
-    }
-    pre#output {
-      background: #fff;
-      border: 1px solid #ddd;
-      border-radius: 0.5rem;
-      padding: 1rem;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      font-family: monospace;
-      font-size: 0.9rem;
-      max-height: 600px;
-      overflow-y: auto;
+    button:hover {
+      background: #f59e0b;
     }
     .status {
+      margin-top: 1rem;
+      font-size: 0.95rem;
+      min-height: 1.25rem;
+    }
+    .error {
+      color: #f87171;
       margin-top: 0.5rem;
-      font-size: 0.9rem;
-      color: #555;
+      white-space: pre-wrap;
+      text-align: left;
+      font-size: 0.85rem;
+      background: #b91c1c33;
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+      max-height: 200px;
+      overflow-y: auto;
     }
   </style>
 </head>
 <body>
-  <header>Gemini Background Report Generator</header>
-  <main>
-    <div class="input-area">
-      <input type="text" id="query" placeholder="Enter a name, topic, or query..." />
-      <button id="generate">Generate</button>
-    </div>
-    <div class="status" id="status">Idle</div>
-    <pre id="output"></pre>
-  </main>
+  <div class="container">
+    <h1>Gemini Report Generator</h1>
+    <textarea id="query" placeholder="Enter a query (e.g. 'Elon Musk background report')..."></textarea>
+    <button onclick="generate()">Generate Report</button>
+    <div id="status" class="status"></div>
+    <div id="errorLog" class="error" style="display:none;"></div>
+  </div>
 
   <script>
-    const GEMINI_API_KEY = "AIzaSyBELzK5j4T6kss4ZQSz4OLB7OLX-Bo_WO4"; // Replace with your key locally
+    const GEMINI_API_KEY = "AIzaSyBELzK5j4T6kss4ZQSz4OLB7OLX-Bo_WO4"; // Replace locally
     const GEMINI_MODEL = "gemini-2.0-flash";
 
     const statusEl = document.getElementById('status');
-    const outputEl = document.getElementById('output');
+    const errorLog = document.getElementById('errorLog');
 
     function setStatus(msg) {
       statusEl.textContent = msg;
     }
 
-    function buildPrompt(query) {
-      return `You are an expert report generator. The user query is: "${query}".
-Return a single complete HTML5 document (with <!DOCTYPE html>, <html>, <head>, and <body> tags) styled like a professional police background search report. Use clean CSS inside <style>.
-Organize the information into structured boxes, tables, and sections (e.g. Profile, History, Records, Media, References). Use placeholder images if none are available. Do not add explanations outside the HTML.`;
+    function logError(msg) {
+      console.error(msg);
+      errorLog.style.display = 'block';
+      errorLog.textContent += `\n${msg}`;
     }
 
-    function getFirstText(data) {
-      try {
-        return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-      } catch (e) {
-        console.error('Error extracting text:', e, data);
-        return null;
-      }
+    function buildPrompt(query) {
+      return `You are an assistant that outputs ONLY a complete, valid HTML5 document. 
+The page must look like a professional police background search report with modern styling, 
+structured boxes, tables, and images if relevant. Include as much detailed, organized information 
+about the topic as possible. First, get all the information that is possible to get about that query, then work on the page. The page must have all the information gathered about the query!
+The HTML must be self-contained with inline CSS, no external links.` + "\n\nQuery: " + query;
     }
 
     function stripCodeFences(text) {
-      return text.replace(/```(html)?/gi, '').trim();
+      return text.replace(/^```(?:html)?/i, '').replace(/```$/, '').trim();
     }
 
-    document.getElementById('generate').addEventListener('click', async () => {
-      const q = document.getElementById('query').value.trim();
-      if (!q) return alert('Enter a query first');
-      if (!GEMINI_API_KEY) return alert('Please add your API key into the code');
+    function getFirstText(data) {
+      return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    }
 
-      setStatus('Sending request...');
-      outputEl.textContent = '';
+    async function generate() {
+      const q = document.getElementById('query').value.trim();
+      if (!q) {
+        setStatus('Enter a query.');
+        return;
+      }
+      errorLog.style.display = 'none';
+      errorLog.textContent = '';
+      setStatus('Generating...');
+
       try {
         const body = {
           contents: [{ role: 'user', parts: [{ text: buildPrompt(q) }] }],
-          generationConfig: { maxOutputTokens: 7000 }
+          generationConfig: { temperature: 0.6, maxOutputTokens: 6000 }
         };
 
         const res = await fetch(
@@ -130,24 +142,32 @@ Organize the information into structured boxes, tables, and sections (e.g. Profi
         );
 
         if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`HTTP ${res.status} ${res.statusText}: ${errText}`);
+          const msg = await res.text();
+          logError(`${res.status} ${res.statusText}: ${msg}`);
+          setStatus('Error');
+          return;
         }
 
         const data = await res.json();
-        console.log('Raw response:', data);
+        console.log('Full Gemini response:', data);
         const text = getFirstText(data);
-        if (!text) throw new Error('Empty response from Gemini');
+        if (!text) {
+          logError('Empty response text from Gemini.');
+          setStatus('Error');
+          return;
+        }
 
         const htmlRaw = stripCodeFences(text);
-        outputEl.textContent = htmlRaw;
-        setStatus('Done');
+        const blob = new Blob([htmlRaw], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+
+        setStatus('Report opened in new tab.');
       } catch (err) {
-        console.error('Error during generation:', err);
-        outputEl.textContent = 'Error: ' + (err?.message || err);
+        logError(err.stack || err);
         setStatus('Error');
       }
-    });
+    }
   </script>
 </body>
 </html>
