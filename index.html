@@ -143,6 +143,7 @@
   <script>
     const GEMINI_API_KEY = "AIzaSyDtkfMLw-k9-Evqy_ncEin8n0xel1eu1cE";
     const GEMINI_MODEL = "gemini-2.0-flash";
+    const SERPAPI_KEY = "YOUR_SERPAPI_KEY"; // 👈 replace with your SerpAPI key
 
     const statusEl = document.getElementById('status');
     const errorLog = document.getElementById('errorLog');
@@ -158,8 +159,11 @@
     }
 
     async function fetchSearchResults(query) {
+      const proxy = "https://cors-anywhere.herokuapp.com/"; // hacky proxy
+      const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${SERPAPI_KEY}`;
+
       try {
-        const res = await fetch(`https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}`);
+        const res = await fetch(proxy + url);
         if (!res.ok) throw new Error("Search API error: " + res.status);
         const data = await res.json();
         return data.organic_results?.map(r => `- ${r.title}: ${r.snippet || ""} (URL: ${r.link})`).join("\n") || "No results.";
@@ -181,17 +185,6 @@ Query: ${query}
 
 Web Search Results:
 ${searchResults}`;
-    }
-
-    function buildFollowUpPrompt(query) {
-      return `You are continuing from the following report HTML content (context background):
----
-${lastReportHTML}
----
-If the query asks for information not in the report then search up the information and give that information!
-You are expected to be accurate, useful, detailed, and knowledgeable.
-Now, answer this follow-up query in detail, factually, and concisely:
-${query}`;
     }
 
     function stripCodeFences(text) {
@@ -232,7 +225,7 @@ ${query}`;
 
         const htmlRaw = stripCodeFences(text);
         lastReportHTML = htmlRaw;
-        const blob = new Blob([htmlRaw + popupTemplate()], { type: 'text/html' });
+        const blob = new Blob([htmlRaw], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
 
@@ -243,38 +236,6 @@ ${query}`;
       } finally {
         loader.style.display = 'none';
       }
-    }
-
-    function popupTemplate() {
-      return `
-        <button class="popup-btn" onclick="document.querySelector('.side-bar').classList.toggle('open')">+</button>
-        <div class="side-bar">
-          <h2>Ask AI</h2>
-          <textarea id="followupQuery" placeholder="Ask about this report..."></textarea>
-          <button onclick="sendFollowUp()">Send</button>
-          <div id="followupLoader" class="loader"></div>
-          <div class="response" id="followupResponse"></div>
-        </div>
-        <script>
-          async function sendFollowUp(){
-            const q=document.getElementById('followupQuery').value.trim();
-            if(!q) return;
-            const loader=document.getElementById('followupLoader');
-            const respBox=document.getElementById('followupResponse');
-            loader.style.display='block'; respBox.textContent='';
-            try{
-              const body={contents:[{role:'user',parts:[{text:\`${buildFollowUpPrompt('${q}')}\`}]}],
-                          generationConfig:{temperature:0.5,maxOutputTokens:2000}};
-              const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}',
-                                    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-              if(!res.ok){respBox.textContent='Error: '+(await res.text()); return;}
-              const data=await res.json();
-              const text=data?.candidates?.[0]?.content?.parts?.[0]?.text||'No response';
-              respBox.textContent=text;
-            }catch(e){respBox.textContent='Error: '+e;}
-            finally{loader.style.display='none';}
-          }
-        <\/script>`;
     }
   </script>
 </body>
