@@ -132,7 +132,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>Gemini Report Generator</h1>
+    <h1>Report Generator</h1>
     <textarea id="query" placeholder="Enter a query (e.g. 'Elon Musk background report')..."></textarea>
     <button onclick="generate()">Generate Report</button>
     <div class="loader" id="loader"></div>
@@ -143,7 +143,6 @@
   <script>
     const GEMINI_API_KEY = "AIzaSyDtkfMLw-k9-Evqy_ncEin8n0xel1eu1cE";
     const GEMINI_MODEL = "gemini-2.0-flash";
-    const SERPAPI_KEY = "3bcc804bc33faea1e8fa694e7db1db2caa6a1e9aa412d6189d951d14f68aa50c"; // 🔑 Put your SerpAPI key here
 
     const statusEl = document.getElementById('status');
     const errorLog = document.getElementById('errorLog');
@@ -160,7 +159,7 @@
 
     async function fetchSearchResults(query) {
       try {
-        const res = await fetch(`https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&api_key=${SERPAPI_KEY}`);
+        const res = await fetch(`https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}`);
         if (!res.ok) throw new Error("Search API error: " + res.status);
         const data = await res.json();
         return data.organic_results?.map(r => `- ${r.title}: ${r.snippet || ""} (URL: ${r.link})`).join("\n") || "No results.";
