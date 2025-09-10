@@ -112,7 +112,7 @@
       errorLog.textContent += `\n${msg}`;
     }
 
-    // ✅ RapidAPI Google Search
+    // ✅ RapidAPI Google Search with required header
     function fetchSearchResults(query) {
       return new Promise((resolve) => {
         const data = null;
@@ -135,6 +135,7 @@
         xhr.open("GET", `https://google-search74.p.rapidapi.com/?query=${encodeURIComponent(query)}&limit=10&related_keywords=true`);
         xhr.setRequestHeader("x-rapidapi-key", "6686103cf4mshbea57d107efd876p1a922bjsndcaa4bca1a70");
         xhr.setRequestHeader("x-rapidapi-host", "google-search74.p.rapidapi.com");
+        xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest"); // ✅ fix for 401
         xhr.send(data);
       });
     }
