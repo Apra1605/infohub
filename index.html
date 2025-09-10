@@ -112,25 +112,31 @@
       errorLog.textContent += `\n${msg}`;
     }
 
-    async function fetchSearchResults(query) {
-      const proxy = "https://cors-anywhere.herokuapp.com/"; // hacky proxy
-      const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}`;
+    // ✅ RapidAPI Google Search
+    function fetchSearchResults(query) {
+      return new Promise((resolve) => {
+        const data = null;
+        const xhr = new XMLHttpRequest();
+        xhr.withCredentials = true;
 
-      try {
-        const res = await fetch(proxy + url, {
-          method: "GET",
-          headers: {
-            "X-Requested-With": "XMLHttpRequest" // ✅ fixes 401 error
+        xhr.addEventListener("readystatechange", function () {
+          if (this.readyState === this.DONE) {
+            try {
+              const res = JSON.parse(this.responseText);
+              const results = res.results?.map(r => `- ${r.title}: ${r.description || ""} (URL: ${r.url})`).join("\n");
+              resolve(results || "No results.");
+            } catch (err) {
+              logError("Search parse error: " + err.message);
+              resolve("No results (parse failed).");
+            }
           }
         });
 
-        if (!res.ok) throw new Error("Search API error: " + res.status);
-        const data = await res.json();
-        return data.organic_results?.map(r => `- ${r.title}: ${r.snippet || ""} (URL: ${r.link})`).join("\n") || "No results.";
-      } catch (e) {
-        logError("Search error: " + e.message);
-        return "No results (search failed).";
-      }
+        xhr.open("GET", `https://google-search74.p.rapidapi.com/?query=${encodeURIComponent(query)}&limit=10&related_keywords=true`);
+        xhr.setRequestHeader("x-rapidapi-key", "6686103cf4mshbea57d107efd876p1a922bjsndcaa4bca1a70");
+        xhr.setRequestHeader("x-rapidapi-host", "google-search74.p.rapidapi.com");
+        xhr.send(data);
+      });
     }
 
     function buildPrompt(query, searchResults) {
