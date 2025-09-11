@@ -1,197 +1,540 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gemini Report Generator</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Universal Background Report</title>
   <style>
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #1f2937, #111827);
-      color: #f9fafb;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
+    :root{
+      --bg1:#0f1724; --bg2:#0b1220; --card:#111827; --accent:#fbbf24; --muted:#9ca3af;
+      --danger:#f87171;
     }
-    .container {
-      background: #1f2937;
-      padding: 2rem;
-      border-radius: 1rem;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-      width: 100%;
-      max-width: 800px;
-      text-align: center;
+    html,body{height:100%;margin:0}
+    body{
+      display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(135deg,var(--bg1),var(--bg2));
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
+      color:#f8fafc;padding:20px;
     }
-    h1 {
-      margin-bottom: 1rem;
-      font-size: 1.75rem;
-      color: #fbbf24;
+    .panel{
+      width:100%; max-width:900px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:12px;padding:22px;box-shadow:0 12px 40px rgba(2,6,23,0.6);
     }
-    textarea {
-      width: 100%;
-      height: 120px;
-      padding: 1rem;
-      border-radius: 0.75rem;
-      border: none;
-      resize: vertical;
-      font-size: 1rem;
-      margin-bottom: 1rem;
-      outline: none;
+    h1{margin:0 0 12px 0;color:var(--accent);font-size:20px}
+    textarea, input[type="text"]{
+      width:100%; padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);
+      background:transparent;color:inherit;font-size:14px;box-sizing:border-box;
     }
-    button {
-      background: #fbbf24;
-      color: #111827;
-      font-weight: bold;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.75rem;
-      cursor: pointer;
-      font-size: 1rem;
-      transition: background 0.2s;
+    .row{display:flex;gap:12px;align-items:center}
+    button{
+      background:var(--accent);color:#111827;border:none;padding:10px 16px;border-radius:10px;cursor:pointer;font-weight:600;
     }
-    button:hover {
-      background: #f59e0b;
-    }
-    .status {
-      margin-top: 1rem;
-      font-size: 0.95rem;
-      min-height: 1.25rem;
-    }
-    .error {
-      color: #f87171;
-      margin-top: 0.5rem;
-      white-space: pre-wrap;
-      text-align: left;
-      font-size: 0.85rem;
-      background: #b91c1c33;
-      padding: 0.75rem;
-      border-radius: 0.5rem;
-      max-height: 200px;
-      overflow-y: auto;
-      display: none;
-    }
-    .loader {
-      display: none;
-      margin: 1rem auto;
-      width: 48px;
-      height: 48px;
-      border: 5px solid #fbbf24;
-      border-top: 5px solid transparent;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    button:disabled{opacity:0.6;cursor:default}
+    .status{margin-top:12px;color:var(--muted);font-size:13px;min-height:18px}
+    .loader{display:inline-block;margin-left:8px;width:18px;height:18px;border-radius:50%;border:3px solid rgba(255,255,255,0.06);border-top-color:var(--accent);animation:spin .9s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .error{margin-top:12px;background:rgba(184,29,29,0.12);color:var(--danger);padding:10px;border-radius:8px;max-height:180px;overflow:auto;white-space:pre-wrap}
+    .hint{font-size:13px;color:var(--muted);margin-top:8px}
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Report Generator</h1>
-    <textarea id="query" placeholder="Enter a query (e.g. 'Elon Musk background report')..."></textarea>
-    <button onclick="generate()">Generate Report</button>
-    <div class="loader" id="loader"></div>
-    <div id="status" class="status"></div>
-    <div id="errorLog" class="error"></div>
+  <div class="panel" role="main" aria-labelledby="title">
+    <h1 id="title">Universal Background Report</h1>
+
+    <div style="margin-bottom:12px">
+      <input id="query" type="text" placeholder="Enter name and optional anchors — e.g. &quot;Justin Priddy -- Gateway Middle School&quot;" />
+    </div>
+
+    <div class="row" style="margin-bottom:8px">
+      <button id="generateBtn">Generate Report</button>
+      <div class="status" id="status">Ready.</div>
+    </div>
+
+    <div class="hint">Only the query input and final report are shown. The tool collects web sources and asks the AI to output a single complete HTML report (opened in a new tab).</div>
+
+    <pre id="errorLog" class="error" style="display:none"></pre>
   </div>
 
   <script>
-    // 🔑 API Keys
-    const GEMINI_API_KEY = "AIzaSyDtkfMLw-k9-Evqy_ncEin8n0xel1eu1cE";
-    const GEMINI_MODEL = "gemini-2.0-flash";
+  /*****************************************************************************
+   * Universal Background Report - single-file implementation
+   * Follow the ideology described by the user (normalization, discovery,
+   * harvesting, scoring, fact extraction, cross-checking, timeliness, synthesis).
+   *
+   * IMPORTANT: Replace the placeholder keys below with your keys and restrict
+   * them to your domain.
+   *****************************************************************************/
 
-    const GOOGLE_API_KEY = "AIzaSyAfYo0mC_GSqTVO7qP2yrkW0c3uljEAIiw";
-    const GOOGLE_CX = "b18a7ac36d73f4973";
+  // -------------------- CONFIG - REPLACE THESE --------------------
+  const GEMINI_API_KEY = "AIzaSyDtkfMLw-k9-Evqy_ncEin8n0xel1eu1cE"; // e.g. AIza... (restrict)
+  const GEMINI_MODEL = "gemini-2.0-flash";
+  const GOOGLE_API_KEY = "AIzaSyAfYo0mC_GSqTVO7qP2yrkW0c3uljEAIiw"; // Google Custom Search API key
+  const GOOGLE_CX = "b18a7ac36d73f4973";           // Programmable Search Engine CX
+  const GNEWS_API_KEY = "c2eb4e5760711417f44a06a6aaaedcf0";   // optional fallback (gnews.io)
+  // ----------------------------------------------------------------
 
-    const statusEl = document.getElementById('status');
-    const errorLog = document.getElementById('errorLog');
-    const loader = document.getElementById('loader');
-    let lastReportHTML = "";
+  // UI elements
+  const queryEl = document.getElementById('query');
+  const statusEl = document.getElementById('status');
+  const generateBtn = document.getElementById('generateBtn');
+  const errorLog = document.getElementById('errorLog');
 
-    function setStatus(msg) { statusEl.textContent = msg; }
-    function logError(msg) {
-      console.error(msg);
-      errorLog.style.display = 'block';
-      errorLog.textContent += `\n${msg}`;
+  function setStatus(msg, busy=false){
+    statusEl.textContent = msg;
+    if (busy){
+      statusEl.insertAdjacentHTML('beforeend',' <span class="loader" aria-hidden="true"></span>');
     }
+  }
+  function logError(msg){
+    console.error(msg);
+    errorLog.style.display = 'block';
+    errorLog.textContent += (errorLog.textContent? "\n" : "") + String(msg);
+  }
+  function clearErrors(){ errorLog.style.display='none'; errorLog.textContent=''; }
 
-    // ✅ Background call to Google Custom Search JSON API
-    async function fetchSearchResults(query) {
-      const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query)}`;
+  // ------------------ Utilities ------------------
+  function safeJSON(str){
+    try { return JSON.parse(str); } catch(e){ return null; }
+  }
+  function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+  // ------------------ 1) Normalize & Variants ------------------
+  function normalizeQuery(raw){
+    const q = String(raw||'').trim().replace(/\s+/g,' ');
+    const parts = q.split('--').map(s=>s.trim()).filter(Boolean);
+    const main = parts[0] || q;
+    const anchors = parts.slice(1).filter(Boolean);
+    return { raw:q, mainEntity: main, anchors };
+  }
+
+  function generateNameVariants(name){
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (parts.length < 2) return [name];
+    const first = parts[0], last = parts[parts.length-1];
+    const middle = parts.slice(1,-1).join(' ');
+    const midI = middle ? middle[0]+'.' : '';
+    const variants = new Set([
+      name,
+      `${first} ${last}`,
+      middle ? `${first} ${middle} ${last}` : null,
+      midI ? `${first} ${midI} ${last}` : null,
+      `${first[0]}. ${last}`
+    ].filter(Boolean));
+    return Array.from(variants);
+  }
+
+  // ------------------ 2) Canonical checks (wiki/wikidata) ------------------
+  async function fetchWikipediaSummary(name){
+    try{
+      const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`;
       const res = await fetch(url);
-      if (!res.ok) throw new Error(`Search API error: ${res.status}`);
-      const data = await res.json();
+      if (!res.ok) return null;
+      const j = await res.json();
+      if (!j || !j.extract) return null;
+      return { type:'wikipedia', title:j.title, url:j.content_urls?.desktop?.page || null, text:j.extract };
+    }catch(e){ return null; }
+  }
 
-      if (!data.items) return "No results.";
-      return data.items.map(item =>
-        `- ${item.title}: ${item.snippet} (URL: ${item.link})`
-      ).join("\n");
+  async function fetchWikidataFacts(name){
+    try{
+      const endpoint = "https://www.wikidata.org/w/api.php";
+      const searchUrl = `${endpoint}?action=wbsearchentities&format=json&language=en&origin=*&search=${encodeURIComponent(name)}`;
+      const sres = await fetch(searchUrl);
+      if (!sres.ok) return null;
+      const sjson = await sres.json();
+      if (!sjson.search || !sjson.search.length) return null;
+      const qid = sjson.search[0].id;
+      const entityUrl = `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json?origin=*`;
+      const eres = await fetch(entityUrl);
+      if (!eres.ok) return null;
+      const ejson = await eres.json();
+      return { type:'wikidata', qid, url:`https://www.wikidata.org/wiki/${qid}`, claims: ejson.entities?.[qid]?.claims || {} };
+    }catch(e){ return null; }
+  }
+
+  // ------------------ 3) Targeted discovery via Google Custom Search ------------------
+  async function fetchCustomSearch(q){
+    try{
+      const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(GOOGLE_API_KEY)}&cx=${encodeURIComponent(GOOGLE_CX)}&q=${encodeURIComponent(q)}`;
+      const res = await fetch(url);
+      if (!res.ok) return [];
+      const j = await res.json();
+      return (j.items||[]).map(i=>({ title:i.title, snippet:i.snippet, link:i.link }));
+    }catch(e){
+      logError("CustomSearch error: "+ (e.message||e));
+      return [];
     }
+  }
 
-    function buildPrompt(query, searchResults) {
-      return `You are an assistant that must output ONLY a complete, valid HTML5 document. The HTML must be self-contained with inline CSS, no external links or markdown fences.
-      It must look like a professional police background search report with modern styling, structured boxes, tables, and images if relevant. Information needs to be exact.
-      Use paragraphs a lot for more information (still organized). Do not generalize! Unknown information should be intently researched. The information should be a lot!!!
-      Include all history and all information. Gather as much detailed, organized information about the query as possible and present it inside this HTML page. All information collected should be fact-checked!
-      Do not include explanations, markdown, or anything else — ONLY the HTML code.
+  function siteQueries(nameVariants, anchors){
+    const quoted = s => `"${s}"`;
+    const base = [];
+    for (const nv of nameVariants) base.push(quoted(nv));
+    for (const a of anchors) for (const nv of nameVariants) base.push(`${quoted(nv)} ${quoted(a)}`);
+    const domains = [
+      'site:everettsd.org',
+      'site:gateway.everettsd.org',
+      'site:fredhutch.org OR site:sciedhutch.org',
+      'site:linkedin.com/in',
+      'site:youtube.com',
+      'site:news.google.com',
+      'site:medium.com OR site:substack.com',
+      'site:twitter.com OR site:x.com'
+    ];
+    const scoped = [];
+    for (const d of domains) for (const nv of nameVariants) scoped.push(`${d} ${quoted(nv)}`);
+    for (const d of domains) for (const a of anchors) for (const nv of nameVariants) scoped.push(`${d} ${quoted(nv)} ${quoted(a)}`);
+    return Array.from(new Set([...base, ...scoped]));
+  }
 
-Query: ${query}
-
-Web Search Results:
-${searchResults}`;
+  async function discoverLinks(nameVariants, anchors){
+    // run site-scoped queries in parallel, but limit to keep fast
+    const queries = siteQueries(nameVariants, anchors).slice(0,20);
+    const all = await Promise.all(queries.map(q=>fetchCustomSearch(q)));
+    const flat = all.flat();
+    const dedup = [];
+    const seen = new Set();
+    for (const it of flat){
+      if (!it.link) continue;
+      if (seen.has(it.link)) continue;
+      seen.add(it.link);
+      dedup.push(it);
+      if (dedup.length >= 25) break;
     }
+    return dedup;
+  }
 
-    function stripCodeFences(text) {
-      return text.replace(/^\s*```(?:html)?/i, '')
-                 .replace(/```\s*$/i, '')
-                 .trim();
+  // fallback to GNews if few links found
+  async function fetchGNews(query){ 
+    if(!GNEWS_API_KEY) return [];
+    try{
+      const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&country=us&max=10&apikey=${encodeURIComponent(GNEWS_API_KEY)}`;
+      const res = await fetch(url);
+      if(!res.ok) return [];
+      const j = await res.json();
+      return (j.articles||[]).map(a=>({ title:a.title, snippet:a.description, link:a.url, date:a.publishedAt }));
+    }catch(e){ return []; }
+  }
+
+  // ------------------ 4) Content harvesting (best-effort in browser) ------------------
+  async function fetchPage(url){
+    try{
+      // Many domains will block CORS — we catch and return null for those
+      const res = await fetch(url, { mode:'cors' });
+      if (!res.ok) return null;
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html,'text/html');
+      const title = doc.querySelector('title')?.textContent?.trim() || '';
+      const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+      const ogDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute('content') || '';
+      const byline = doc.querySelector('[rel="author"], .byline, .author')?.textContent || doc.querySelector('meta[name="author"]')?.getAttribute('content') || '';
+      const date = doc.querySelector('time[datetime]')?.getAttribute('datetime') 
+                || doc.querySelector('meta[property="article:published_time"]')?.getAttribute('content')
+                || doc.querySelector('meta[name="date"]')?.getAttribute('content') || null;
+      const paragraphs = Array.from(doc.querySelectorAll('p')).map(p=>p.textContent.trim()).filter(Boolean);
+      const text = paragraphs.join('\n').slice(0,5000);
+      return { title, metaDesc: metaDesc||ogDesc, byline, date, text, url };
+    }catch(e){
+      // CORS or parse error
+      return null;
     }
+  }
 
-    function getFirstText(data) {
-      return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    }
+  async function harvestContents(links){
+    const top = links.slice(0,12);
+    const pages = await Promise.all(top.map(l => fetchPage(l.link || l)));
+    return pages.filter(Boolean);
+  }
 
-    async function generate() {
-      const q = document.getElementById('query').value.trim();
-      if (!q) { setStatus('Enter a query.'); return; }
-      errorLog.style.display = 'none';
-      errorLog.textContent = '';
-      loader.style.display = 'block';
-      setStatus('Fetching search results...');
+  // ------------------ 5) Disambiguation scoring ------------------
+  function scorePage(page, anchors){
+    const hay = `${page.title}\n${page.metaDesc}\n${page.text}`.toLowerCase();
+    let score = 0;
+    for (const a of anchors) if (hay.includes(a.toLowerCase())) score += 2;
+    if (hay.includes('gateway middle school')) score += 2;
+    if (hay.includes('everett school district')) score += 2;
+    if (hay.includes('science teacher') || hay.includes('teacher') || hay.includes('stem')) score += 1;
+    if (hay.includes('different district') || hay.includes('another state')) score -= 2;
+    try{ const host = new URL(page.url).host; if (host.endsWith('.edu')||host.endsWith('.org')) score += 1; }catch(e){}
+    return score;
+  }
 
-      try {
-        const searchResults = await fetchSearchResults(q);
+  function filterRelevantPages(pages, anchors, threshold=2){
+    const scored = pages.map(p=>({...p,_score:scorePage(p,anchors)})).sort((a,b)=>b._score-a._score);
+    return scored.filter(p=>p._score>=threshold).slice(0,10);
+  }
 
-        setStatus('Generating...');
-        const body = { contents: [{ role: 'user', parts: [{ text: buildPrompt(q, searchResults) }] }],
-                       generationConfig: { temperature: 0.5, maxOutputTokens: 6000 } };
+  // ------------------ 6) Fact extraction & cross-check ------------------
+  function sentenceSplit(text){
+    return text.split(/(?<=[.!?])\s+/).map(s=>s.trim()).filter(Boolean);
+  }
 
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
-          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-        );
-
-        if (!res.ok) { logError(await res.text()); setStatus('Error'); loader.style.display='none'; return; }
-
-        const data = await res.json();
-        const text = getFirstText(data);
-        if (!text) { logError('Empty response text.'); setStatus('Error'); loader.style.display='none'; return; }
-
-        const htmlRaw = stripCodeFences(text);
-        lastReportHTML = htmlRaw;
-        const blob = new Blob([htmlRaw], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-
-        setStatus('Report opened in new tab.');
-      } catch (err) {
-        logError(err.stack || err);
-        setStatus('Error');
-      } finally {
-        loader.style.display = 'none';
+  function extractCandidates(pages, entityName){
+    const facts = [];
+    const nameLower = entityName.toLowerCase();
+    const roleRegex = /(teacher|science teacher|instructor|educator|professor|coach)/i;
+    const awardRegex = /(award|fellowship|honor|grant|recognition)/i;
+    const projectRegex = /(project|program|research|curriculum|initiative)/i;
+    for (const p of pages){
+      const sents = sentenceSplit(p.text).filter(s => s.toLowerCase().includes(entityName.toLowerCase()));
+      for (const s of sents){
+        const tags=[];
+        if (roleRegex.test(s)) tags.push('role');
+        if (awardRegex.test(s)) tags.push('award');
+        if (projectRegex.test(s)) tags.push('project');
+        if (/everett school district/i.test(s)) tags.push('district');
+        if (/gateway middle school/i.test(s)) tags.push('school');
+        facts.push({ sentence:s, date:p.date||null, url:p.url, title:p.title, tags });
       }
     }
+    return facts;
+  }
+
+  function crossCheckFacts(facts){
+    // normalize and group similar sentences
+    const norm = s => s.toLowerCase().replace(/\W+/g,' ').slice(0,140);
+    const groups = new Map();
+    for (const f of facts){
+      const key = norm(f.sentence);
+      if (!groups.has(key)) groups.set(key,[]);
+      groups.get(key).push(f);
+    }
+    const merged = [];
+    for (const [k,arr] of groups.entries()){
+      const urls = Array.from(new Set(arr.map(a=>a.url)));
+      const titles = Array.from(new Set(arr.map(a=>a.title)));
+      const tags = Array.from(new Set(arr.flatMap(a=>a.tags)));
+      const dates = arr.map(a=>a.date).filter(Boolean).sort();
+      merged.push({
+        text: arr[0].sentence,
+        sources: arr.map(a=>({ url:a.url, title:a.title, date:a.date||null })),
+        corroborationCount: urls.length,
+        tags,
+        latestDate: dates.length? dates[dates.length-1]:null
+      });
+    }
+    return merged;
+  }
+
+  // ------------------ 7) Timeliness & prune ------------------
+  function filterByTimeliness(facts, years=4){
+    const now = new Date();
+    const threshold = new Date(now.getFullYear()-years, now.getMonth(), now.getDate());
+    return facts.filter(f=>{
+      if (!f.latestDate) return true;
+      const d = new Date(f.latestDate);
+      return isFinite(d)? d >= threshold : true;
+    });
+  }
+
+  // ------------------ 8) Build Gemini prompt payload ------------------
+  function buildSourcesList(items){
+    const map = new Map();
+    for (const it of items){
+      for (const s of it.sources){
+        if (!map.has(s.url)) map.set(s.url,{ title:s.title||s.url, url:s.url, date:s.date||null});
+      }
+    }
+    return Array.from(map.values()).slice(0,20);
+  }
+
+  function buildGeminiPayload(query, personName, relevantPages, vettedFacts){
+    const sources = buildSourcesList(vettedFacts);
+    function srcIndex(url){ return Math.max(1, sources.findIndex(s=>s.url===url)+1); }
+    const factLines = vettedFacts.map(f=>{
+      const idxs = Array.from(new Set(f.sources.map(s=>srcIndex(s.url)))).filter(Boolean).sort((a,b)=>a-b);
+      return `- Fact: ${f.text}\n  Sources: [${idxs.join(', ')}]\n  Tags: ${f.tags.join(', ')||'general'}\n  LatestDate: ${f.latestDate||'n/a'}`;
+    });
+    const sourcesBlock = sources.map((s,i)=>`${i+1}. ${s.title} — ${s.url}${s.date?` (${s.date})`:''}`).join('\n');
+
+    const gatheredOverview = relevantPages.slice(0,6).map(p=>`- ${p.title}\n  URL: ${p.url}\n  Date: ${p.date||'n/a'}\n  Excerpt: ${p.metaDesc||''}`).join('\n');
+
+    const prompt = `
+Task:
+Create a factual, well-structured report for the query: "${query}".
+Focus on the person "${personName}" and their direct affiliations only. Exclude unrelated info.
+
+Strict rules:
+- Use ONLY the provided facts and excerpts below. Do NOT invent or infer new facts.
+- Summarize concisely and clearly.
+- Include inline numeric citations like [1], [2] that map to the Sources section.
+- Flag items supported by only one source as "(low confidence)".
+- Prefer the most recent dated facts when conflicts exist.
+- Output ONLY a single, complete HTML5 document with inline CSS (no markdown).
+
+Sections required:
+1) Overview
+2) Current role and affiliation
+3) Background (concise)
+4) Projects, recognition, or fellowships (with dates if available)
+5) Recent mentions (last 3–5 years)
+6) Selected links (1–3 key items)
+7) Sources (numbered list)
+
+Extracted sources (for citation mapping):
+${sourcesBlock}
+
+High-confidence facts and snippets (each with source indices):
+${factLines.join('\n')}
+
+Additional Page Context (for color only, not for new facts):
+${gatheredOverview}
+`.trim();
+
+    return { contents:[{ role:'user', parts:[{ text:prompt }] }], generationConfig:{ temperature:0.2, maxOutputTokens:6000 } };
+  }
+
+  // ------------------ Helper: get first output text from Gemini response ------------------
+  function getFirstText(data){
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  }
+
+  // ------------------ Disambiguation check ------------------
+  function checkCollisions(relevantPages, personName){
+    // If we have multiple distinct contexts with same name (low corroboration across pages),
+    // prompt user to disambiguate.
+    if (!relevantPages || relevantPages.length===0) return { collision:false };
+    // Count distinct hostnames
+    const hosts = new Set(relevantPages.map(p=>{
+      try{ return new URL(p.url).host.replace(/^www\./,''); }catch(e){ return p.url; }
+    }));
+    // Count corroborated facts
+    const corroborationCounts = new Set(relevantPages.map(p => p._score || 0));
+    // Basic heuristic: if many hosts and low scores, collision possible
+    if (hosts.size >= 6 && (relevantPages.filter(p=>p._score>=3).length < 2)) {
+      return { collision:true, reason:'Multiple distinct sources with limited corroboration' };
+    }
+    return { collision:false };
+  }
+
+  // ------------------ 9) End-to-end generate ------------------
+  async function generate(){
+    clearErrors();
+    const raw = (queryEl.value||'').trim();
+    if (!raw){ setStatus('Enter a query.'); return; }
+    generateBtn.disabled = true;
+    setStatus('Normalizing query...', true);
+
+    try{
+      const { mainEntity, anchors } = normalizeQuery(raw);
+      const variants = generateNameVariants(mainEntity);
+
+      // canonical checks
+      setStatus('Checking Wikipedia / Wikidata...', true);
+      const [wiki, wikidata] = await Promise.all([ fetchWikipediaSummary(mainEntity), fetchWikidataFacts(mainEntity) ]);
+
+      // discovery
+      setStatus('Discovering authoritative sources...', true);
+      let links = await discoverLinks(variants, anchors);
+      if (links.length < 6){
+        // fallback to GNews
+        const gnews = await fetchGNews(`${mainEntity} ${anchors.join(' ')}`.trim());
+        links = Array.from(new Map([...links, ...gnews].map(i=>[i.link||i.title, i])).values()).slice(0,25);
+      }
+
+      setStatus('Harvesting page contents (best-effort)...', true);
+      const pages = await harvestContents(links);
+      if (pages.length === 0) {
+        setStatus('No pages could be fetched (CORS or no results). Attempting summary-only flow...', true);
+      }
+
+      setStatus('Scoring & filtering relevance...', true);
+      const relevantPages = filterRelevantPages(pages, anchors, 2);
+
+      // disambiguation check
+      const coll = checkCollisions(relevantPages, mainEntity);
+      if (coll.collision){
+        // Ask user briefly to disambiguate
+        setStatus('Multiple possible people match this name — please add a disambiguator (city, org, or program) and try again.');
+        generateBtn.disabled = false;
+        return;
+      }
+
+      setStatus('Extracting candidate facts...', true);
+      const rawFacts = extractCandidates(relevantPages, mainEntity);
+
+      setStatus('Cross-checking & consolidating facts...', true);
+      const merged = crossCheckFacts(rawFacts);
+
+      setStatus('Applying timeliness rules...', true);
+      const timely = filterByTimeliness(merged, 4);
+
+      // sort by corroboration then recency
+      timely.sort((a,b)=>{
+        if (b.corroborationCount !== a.corroborationCount) return b.corroborationCount - a.corroborationCount;
+        const da = a.latestDate ? new Date(a.latestDate).getTime() : 0;
+        const db = b.latestDate ? new Date(b.latestDate).getTime() : 0;
+        return db - da;
+      });
+
+      const vettedFacts = timely.slice(0, 30);
+      // optionally include wiki as low priority if exact match
+      if (wiki && (wiki.title||'').toLowerCase() === mainEntity.toLowerCase()){
+        vettedFacts.push({ text: wiki.text, sources:[{ url: wiki.url, title: wiki.title, date:null }], corroborationCount:1, tags:['general'], latestDate:null });
+      }
+
+      setStatus('Preparing synthesis prompt for Gemini...', true);
+      const payload = buildGeminiPayload(raw, mainEntity, relevantPages, vettedFacts);
+
+      setStatus('Requesting Gemini to synthesize report...', true);
+
+      const gres = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`, {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!gres.ok){
+        const txt = await gres.text();
+        logError('Gemini API error: ' + txt);
+        setStatus('Error from Gemini API.');
+        generateBtn.disabled = false;
+        return;
+      }
+
+      const gjson = await gres.json();
+      const out = getFirstText(gjson);
+      if (!out){
+        logError('Empty output from Gemini.');
+        setStatus('Gemini returned empty result.');
+        generateBtn.disabled = false;
+        return;
+      }
+
+      // strip triple-backticks if present, ensure it's a full HTML doc
+      const htmlRaw = String(out).replace(/^\s*```(?:html)?/i,'').replace(/```$/i,'').trim();
+
+      // open in new tab as a blob to avoid running inline external loads from caller page
+      const blob = new Blob([htmlRaw], { type:'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+
+      setStatus('Report opened in a new tab.');
+    }catch(err){
+      logError(err.stack || err || 'Unknown error');
+      setStatus('Error');
+    }finally{
+      generateBtn.disabled = false;
+    }
+  }
+
+  // wire up
+  generateBtn.addEventListener('click', generate);
+  queryEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && (e.ctrlKey||e.metaKey)) generate(); });
+
+  // quick note if keys missing
+  (function checkKeys(){
+    const missing = [];
+    if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_')) missing.push('Gemini API key');
+    if (!GOOGLE_API_KEY || GOOGLE_API_KEY.includes('YOUR_')) missing.push('Google Custom Search API key (GOOGLE_API_KEY)');
+    if (!GOOGLE_CX || GOOGLE_CX.includes('YOUR_')) missing.push('Google Custom Search CX (GOOGLE_CX)');
+    if (missing.length){
+      logError('⚠️ Please replace placeholder API keys in the script for production: ' + missing.join(', '));
+      setStatus('Keys missing or placeholders present — replace keys in the script.');
+    }
+  })();
+
   </script>
 </body>
 </html>
