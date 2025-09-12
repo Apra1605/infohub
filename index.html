@@ -1,540 +1,120 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Universal Background Report</title>
-  <style>
-    :root{
-      --bg1:#0f1724; --bg2:#0b1220; --card:#111827; --accent:#fbbf24; --muted:#9ca3af;
-      --danger:#f87171;
-    }
-    html,body{height:100%;margin:0}
-    body{
-      display:flex;align-items:center;justify-content:center;
-      background:linear-gradient(135deg,var(--bg1),var(--bg2));
-      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
-      color:#f8fafc;padding:20px;
-    }
-    .panel{
-      width:100%; max-width:900px;
-      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-      border-radius:12px;padding:22px;box-shadow:0 12px 40px rgba(2,6,23,0.6);
-    }
-    h1{margin:0 0 12px 0;color:var(--accent);font-size:20px}
-    textarea, input[type="text"]{
-      width:100%; padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);
-      background:transparent;color:inherit;font-size:14px;box-sizing:border-box;
-    }
-    .row{display:flex;gap:12px;align-items:center}
-    button{
-      background:var(--accent);color:#111827;border:none;padding:10px 16px;border-radius:10px;cursor:pointer;font-weight:600;
-    }
-    button:disabled{opacity:0.6;cursor:default}
-    .status{margin-top:12px;color:var(--muted);font-size:13px;min-height:18px}
-    .loader{display:inline-block;margin-left:8px;width:18px;height:18px;border-radius:50%;border:3px solid rgba(255,255,255,0.06);border-top-color:var(--accent);animation:spin .9s linear infinite}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .error{margin-top:12px;background:rgba(184,29,29,0.12);color:var(--danger);padding:10px;border-radius:8px;max-height:180px;overflow:auto;white-space:pre-wrap}
-    .hint{font-size:13px;color:var(--muted);margin-top:8px}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Universal Background Report (Front)</title>
+<style>
+  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b1220;color:#eef2ff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+  .card{width:100%;max-width:900px;padding:20px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));box-shadow:0 12px 40px rgba(2,6,23,0.6)}
+  input{width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+  button{padding:10px 14px;background:#fbbf24;border:none;border-radius:10px;color:#111;font-weight:700;cursor:pointer;margin-top:10px}
+  .status{margin-top:12px;color:#9ca3af}
+  pre.error{margin-top:10px;background:rgba(200,0,0,0.12);color:#ffb4b4;padding:10px;border-radius:8px;display:none}
+</style>
 </head>
 <body>
-  <div class="panel" role="main" aria-labelledby="title">
-    <h1 id="title">Universal Background Report</h1>
-
-    <div style="margin-bottom:12px">
-      <input id="query" type="text" placeholder="Enter name and optional anchors — e.g. &quot;Justin Priddy -- Gateway Middle School&quot;" />
+  <div class="card">
+    <h2>Universal Background Report</h2>
+    <input id="query" placeholder='Enter "Justin Priddy -- Gateway Middle School"' />
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="go">Generate</button>
+      <div class="status" id="status">Ready</div>
     </div>
-
-    <div class="row" style="margin-bottom:8px">
-      <button id="generateBtn">Generate Report</button>
-      <div class="status" id="status">Ready.</div>
-    </div>
-
-    <div class="hint">Only the query input and final report are shown. The tool collects web sources and asks the AI to output a single complete HTML report (opened in a new tab).</div>
-
-    <pre id="errorLog" class="error" style="display:none"></pre>
+    <pre id="errorLog" class="error"></pre>
   </div>
 
-  <script>
-  /*****************************************************************************
-   * Universal Background Report - single-file implementation
-   * Follow the ideology described by the user (normalization, discovery,
-   * harvesting, scoring, fact extraction, cross-checking, timeliness, synthesis).
-   *
-   * IMPORTANT: Replace the placeholder keys below with your keys and restrict
-   * them to your domain.
-   *****************************************************************************/
+<script>
+  const WORKER_ENDPOINT = "https://report.anmol-prash.workers.dev/"; // <- REPLACE with your deployed Worker URL
 
-  // -------------------- CONFIG - REPLACE THESE --------------------
-  const GEMINI_API_KEY = "AIzaSyDtkfMLw-k9-Evqy_ncEin8n0xel1eu1cE"; // e.g. AIza... (restrict)
-  const GEMINI_MODEL = "gemini-2.0-flash";
-  const GOOGLE_API_KEY = "AIzaSyAfYo0mC_GSqTVO7qP2yrkW0c3uljEAIiw"; // Google Custom Search API key
-  const GOOGLE_CX = "b18a7ac36d73f4973";           // Programmable Search Engine CX
-  const GNEWS_API_KEY = "c2eb4e5760711417f44a06a6aaaedcf0";   // optional fallback (gnews.io)
-  // ----------------------------------------------------------------
-
-  // UI elements
-  const queryEl = document.getElementById('query');
-  const statusEl = document.getElementById('status');
-  const generateBtn = document.getElementById('generateBtn');
+  const qEl = document.getElementById('query');
+  const btn = document.getElementById('go');
+  const status = document.getElementById('status');
   const errorLog = document.getElementById('errorLog');
 
-  function setStatus(msg, busy=false){
-    statusEl.textContent = msg;
-    if (busy){
-      statusEl.insertAdjacentHTML('beforeend',' <span class="loader" aria-hidden="true"></span>');
-    }
-  }
-  function logError(msg){
-    console.error(msg);
-    errorLog.style.display = 'block';
-    errorLog.textContent += (errorLog.textContent? "\n" : "") + String(msg);
-  }
-  function clearErrors(){ errorLog.style.display='none'; errorLog.textContent=''; }
-
-  // ------------------ Utilities ------------------
-  function safeJSON(str){
-    try { return JSON.parse(str); } catch(e){ return null; }
-  }
-  function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-
-  // ------------------ 1) Normalize & Variants ------------------
-  function normalizeQuery(raw){
-    const q = String(raw||'').trim().replace(/\s+/g,' ');
-    const parts = q.split('--').map(s=>s.trim()).filter(Boolean);
-    const main = parts[0] || q;
-    const anchors = parts.slice(1).filter(Boolean);
-    return { raw:q, mainEntity: main, anchors };
-  }
-
-  function generateNameVariants(name){
-    const parts = name.split(/\s+/).filter(Boolean);
-    if (parts.length < 2) return [name];
-    const first = parts[0], last = parts[parts.length-1];
-    const middle = parts.slice(1,-1).join(' ');
-    const midI = middle ? middle[0]+'.' : '';
-    const variants = new Set([
-      name,
-      `${first} ${last}`,
-      middle ? `${first} ${middle} ${last}` : null,
-      midI ? `${first} ${midI} ${last}` : null,
-      `${first[0]}. ${last}`
-    ].filter(Boolean));
-    return Array.from(variants);
-  }
-
-  // ------------------ 2) Canonical checks (wiki/wikidata) ------------------
-  async function fetchWikipediaSummary(name){
-    try{
-      const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(name)}`;
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      const j = await res.json();
-      if (!j || !j.extract) return null;
-      return { type:'wikipedia', title:j.title, url:j.content_urls?.desktop?.page || null, text:j.extract };
-    }catch(e){ return null; }
-  }
-
-  async function fetchWikidataFacts(name){
-    try{
-      const endpoint = "https://www.wikidata.org/w/api.php";
-      const searchUrl = `${endpoint}?action=wbsearchentities&format=json&language=en&origin=*&search=${encodeURIComponent(name)}`;
-      const sres = await fetch(searchUrl);
-      if (!sres.ok) return null;
-      const sjson = await sres.json();
-      if (!sjson.search || !sjson.search.length) return null;
-      const qid = sjson.search[0].id;
-      const entityUrl = `https://www.wikidata.org/wiki/Special:EntityData/${qid}.json?origin=*`;
-      const eres = await fetch(entityUrl);
-      if (!eres.ok) return null;
-      const ejson = await eres.json();
-      return { type:'wikidata', qid, url:`https://www.wikidata.org/wiki/${qid}`, claims: ejson.entities?.[qid]?.claims || {} };
-    }catch(e){ return null; }
-  }
-
-  // ------------------ 3) Targeted discovery via Google Custom Search ------------------
-  async function fetchCustomSearch(q){
-    try{
-      const url = `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(GOOGLE_API_KEY)}&cx=${encodeURIComponent(GOOGLE_CX)}&q=${encodeURIComponent(q)}`;
-      const res = await fetch(url);
-      if (!res.ok) return [];
-      const j = await res.json();
-      return (j.items||[]).map(i=>({ title:i.title, snippet:i.snippet, link:i.link }));
-    }catch(e){
-      logError("CustomSearch error: "+ (e.message||e));
-      return [];
+  function setStatus(text, busy=false){
+    status.textContent = text;
+    if (busy) {
+      const loader = document.createElement('span');
+      loader.style.display='inline-block';
+      loader.style.width='14px';
+      loader.style.height='14px';
+      loader.style.marginLeft='8px';
+      loader.style.border='2px solid rgba(255,255,255,0.15)';
+      loader.style.borderTopColor='#fbbf24';
+      loader.style.borderRadius='50%';
+      loader.style.animation='spin 0.9s linear infinite';
+      loader.className='__ldr';
+      status.appendChild(loader);
+      // add keyframes programmatically
+      const style = document.createElement('style');
+      style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
+      document.head.appendChild(style);
+    } else {
+      const l = status.querySelector('.__ldr');
+      if (l) l.remove();
     }
   }
 
-  function siteQueries(nameVariants, anchors){
-    const quoted = s => `"${s}"`;
-    const base = [];
-    for (const nv of nameVariants) base.push(quoted(nv));
-    for (const a of anchors) for (const nv of nameVariants) base.push(`${quoted(nv)} ${quoted(a)}`);
-    const domains = [
-      'site:everettsd.org',
-      'site:gateway.everettsd.org',
-      'site:fredhutch.org OR site:sciedhutch.org',
-      'site:linkedin.com/in',
-      'site:youtube.com',
-      'site:news.google.com',
-      'site:medium.com OR site:substack.com',
-      'site:twitter.com OR site:x.com'
-    ];
-    const scoped = [];
-    for (const d of domains) for (const nv of nameVariants) scoped.push(`${d} ${quoted(nv)}`);
-    for (const d of domains) for (const a of anchors) for (const nv of nameVariants) scoped.push(`${d} ${quoted(nv)} ${quoted(a)}`);
-    return Array.from(new Set([...base, ...scoped]));
+  function showError(msg){
+    errorLog.style.display='block';
+    errorLog.textContent = (errorLog.textContent ? errorLog.textContent + '\n' : '') + msg;
   }
 
-  async function discoverLinks(nameVariants, anchors){
-    // run site-scoped queries in parallel, but limit to keep fast
-    const queries = siteQueries(nameVariants, anchors).slice(0,20);
-    const all = await Promise.all(queries.map(q=>fetchCustomSearch(q)));
-    const flat = all.flat();
-    const dedup = [];
-    const seen = new Set();
-    for (const it of flat){
-      if (!it.link) continue;
-      if (seen.has(it.link)) continue;
-      seen.add(it.link);
-      dedup.push(it);
-      if (dedup.length >= 25) break;
-    }
-    return dedup;
-  }
-
-  // fallback to GNews if few links found
-  async function fetchGNews(query){ 
-    if(!GNEWS_API_KEY) return [];
-    try{
-      const url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&country=us&max=10&apikey=${encodeURIComponent(GNEWS_API_KEY)}`;
-      const res = await fetch(url);
-      if(!res.ok) return [];
-      const j = await res.json();
-      return (j.articles||[]).map(a=>({ title:a.title, snippet:a.description, link:a.url, date:a.publishedAt }));
-    }catch(e){ return []; }
-  }
-
-  // ------------------ 4) Content harvesting (best-effort in browser) ------------------
-  async function fetchPage(url){
-    try{
-      // Many domains will block CORS — we catch and return null for those
-      const res = await fetch(url, { mode:'cors' });
-      if (!res.ok) return null;
-      const html = await res.text();
-      const doc = new DOMParser().parseFromString(html,'text/html');
-      const title = doc.querySelector('title')?.textContent?.trim() || '';
-      const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content') || '';
-      const ogDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute('content') || '';
-      const byline = doc.querySelector('[rel="author"], .byline, .author')?.textContent || doc.querySelector('meta[name="author"]')?.getAttribute('content') || '';
-      const date = doc.querySelector('time[datetime]')?.getAttribute('datetime') 
-                || doc.querySelector('meta[property="article:published_time"]')?.getAttribute('content')
-                || doc.querySelector('meta[name="date"]')?.getAttribute('content') || null;
-      const paragraphs = Array.from(doc.querySelectorAll('p')).map(p=>p.textContent.trim()).filter(Boolean);
-      const text = paragraphs.join('\n').slice(0,5000);
-      return { title, metaDesc: metaDesc||ogDesc, byline, date, text, url };
-    }catch(e){
-      // CORS or parse error
-      return null;
-    }
-  }
-
-  async function harvestContents(links){
-    const top = links.slice(0,12);
-    const pages = await Promise.all(top.map(l => fetchPage(l.link || l)));
-    return pages.filter(Boolean);
-  }
-
-  // ------------------ 5) Disambiguation scoring ------------------
-  function scorePage(page, anchors){
-    const hay = `${page.title}\n${page.metaDesc}\n${page.text}`.toLowerCase();
-    let score = 0;
-    for (const a of anchors) if (hay.includes(a.toLowerCase())) score += 2;
-    if (hay.includes('gateway middle school')) score += 2;
-    if (hay.includes('everett school district')) score += 2;
-    if (hay.includes('science teacher') || hay.includes('teacher') || hay.includes('stem')) score += 1;
-    if (hay.includes('different district') || hay.includes('another state')) score -= 2;
-    try{ const host = new URL(page.url).host; if (host.endsWith('.edu')||host.endsWith('.org')) score += 1; }catch(e){}
-    return score;
-  }
-
-  function filterRelevantPages(pages, anchors, threshold=2){
-    const scored = pages.map(p=>({...p,_score:scorePage(p,anchors)})).sort((a,b)=>b._score-a._score);
-    return scored.filter(p=>p._score>=threshold).slice(0,10);
-  }
-
-  // ------------------ 6) Fact extraction & cross-check ------------------
-  function sentenceSplit(text){
-    return text.split(/(?<=[.!?])\s+/).map(s=>s.trim()).filter(Boolean);
-  }
-
-  function extractCandidates(pages, entityName){
-    const facts = [];
-    const nameLower = entityName.toLowerCase();
-    const roleRegex = /(teacher|science teacher|instructor|educator|professor|coach)/i;
-    const awardRegex = /(award|fellowship|honor|grant|recognition)/i;
-    const projectRegex = /(project|program|research|curriculum|initiative)/i;
-    for (const p of pages){
-      const sents = sentenceSplit(p.text).filter(s => s.toLowerCase().includes(entityName.toLowerCase()));
-      for (const s of sents){
-        const tags=[];
-        if (roleRegex.test(s)) tags.push('role');
-        if (awardRegex.test(s)) tags.push('award');
-        if (projectRegex.test(s)) tags.push('project');
-        if (/everett school district/i.test(s)) tags.push('district');
-        if (/gateway middle school/i.test(s)) tags.push('school');
-        facts.push({ sentence:s, date:p.date||null, url:p.url, title:p.title, tags });
-      }
-    }
-    return facts;
-  }
-
-  function crossCheckFacts(facts){
-    // normalize and group similar sentences
-    const norm = s => s.toLowerCase().replace(/\W+/g,' ').slice(0,140);
-    const groups = new Map();
-    for (const f of facts){
-      const key = norm(f.sentence);
-      if (!groups.has(key)) groups.set(key,[]);
-      groups.get(key).push(f);
-    }
-    const merged = [];
-    for (const [k,arr] of groups.entries()){
-      const urls = Array.from(new Set(arr.map(a=>a.url)));
-      const titles = Array.from(new Set(arr.map(a=>a.title)));
-      const tags = Array.from(new Set(arr.flatMap(a=>a.tags)));
-      const dates = arr.map(a=>a.date).filter(Boolean).sort();
-      merged.push({
-        text: arr[0].sentence,
-        sources: arr.map(a=>({ url:a.url, title:a.title, date:a.date||null })),
-        corroborationCount: urls.length,
-        tags,
-        latestDate: dates.length? dates[dates.length-1]:null
-      });
-    }
-    return merged;
-  }
-
-  // ------------------ 7) Timeliness & prune ------------------
-  function filterByTimeliness(facts, years=4){
-    const now = new Date();
-    const threshold = new Date(now.getFullYear()-years, now.getMonth(), now.getDate());
-    return facts.filter(f=>{
-      if (!f.latestDate) return true;
-      const d = new Date(f.latestDate);
-      return isFinite(d)? d >= threshold : true;
-    });
-  }
-
-  // ------------------ 8) Build Gemini prompt payload ------------------
-  function buildSourcesList(items){
-    const map = new Map();
-    for (const it of items){
-      for (const s of it.sources){
-        if (!map.has(s.url)) map.set(s.url,{ title:s.title||s.url, url:s.url, date:s.date||null});
-      }
-    }
-    return Array.from(map.values()).slice(0,20);
-  }
-
-  function buildGeminiPayload(query, personName, relevantPages, vettedFacts){
-    const sources = buildSourcesList(vettedFacts);
-    function srcIndex(url){ return Math.max(1, sources.findIndex(s=>s.url===url)+1); }
-    const factLines = vettedFacts.map(f=>{
-      const idxs = Array.from(new Set(f.sources.map(s=>srcIndex(s.url)))).filter(Boolean).sort((a,b)=>a-b);
-      return `- Fact: ${f.text}\n  Sources: [${idxs.join(', ')}]\n  Tags: ${f.tags.join(', ')||'general'}\n  LatestDate: ${f.latestDate||'n/a'}`;
-    });
-    const sourcesBlock = sources.map((s,i)=>`${i+1}. ${s.title} — ${s.url}${s.date?` (${s.date})`:''}`).join('\n');
-
-    const gatheredOverview = relevantPages.slice(0,6).map(p=>`- ${p.title}\n  URL: ${p.url}\n  Date: ${p.date||'n/a'}\n  Excerpt: ${p.metaDesc||''}`).join('\n');
-
-    const prompt = `
-Task:
-Create a factual, well-structured report for the query: "${query}".
-Focus on the person "${personName}" and their direct affiliations only. Exclude unrelated info.
-
-Strict rules:
-- Use ONLY the provided facts and excerpts below. Do NOT invent or infer new facts.
-- Summarize concisely and clearly.
-- Include inline numeric citations like [1], [2] that map to the Sources section.
-- Flag items supported by only one source as "(low confidence)".
-- Prefer the most recent dated facts when conflicts exist.
-- Output ONLY a single, complete HTML5 document with inline CSS (no markdown).
-
-Sections required:
-1) Overview
-2) Current role and affiliation
-3) Background (concise)
-4) Projects, recognition, or fellowships (with dates if available)
-5) Recent mentions (last 3–5 years)
-6) Selected links (1–3 key items)
-7) Sources (numbered list)
-
-Extracted sources (for citation mapping):
-${sourcesBlock}
-
-High-confidence facts and snippets (each with source indices):
-${factLines.join('\n')}
-
-Additional Page Context (for color only, not for new facts):
-${gatheredOverview}
-`.trim();
-
-    return { contents:[{ role:'user', parts:[{ text:prompt }] }], generationConfig:{ temperature:0.2, maxOutputTokens:6000 } };
-  }
-
-  // ------------------ Helper: get first output text from Gemini response ------------------
-  function getFirstText(data){
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  }
-
-  // ------------------ Disambiguation check ------------------
-  function checkCollisions(relevantPages, personName){
-    // If we have multiple distinct contexts with same name (low corroboration across pages),
-    // prompt user to disambiguate.
-    if (!relevantPages || relevantPages.length===0) return { collision:false };
-    // Count distinct hostnames
-    const hosts = new Set(relevantPages.map(p=>{
-      try{ return new URL(p.url).host.replace(/^www\./,''); }catch(e){ return p.url; }
-    }));
-    // Count corroborated facts
-    const corroborationCounts = new Set(relevantPages.map(p => p._score || 0));
-    // Basic heuristic: if many hosts and low scores, collision possible
-    if (hosts.size >= 6 && (relevantPages.filter(p=>p._score>=3).length < 2)) {
-      return { collision:true, reason:'Multiple distinct sources with limited corroboration' };
-    }
-    return { collision:false };
-  }
-
-  // ------------------ 9) End-to-end generate ------------------
   async function generate(){
-    clearErrors();
-    const raw = (queryEl.value||'').trim();
-    if (!raw){ setStatus('Enter a query.'); return; }
-    generateBtn.disabled = true;
-    setStatus('Normalizing query...', true);
+    errorLog.style.display='none'; errorLog.textContent='';
+    const q = (qEl.value||'').trim();
+    if (!q) { setStatus('Enter a query.'); return; }
+    btn.disabled = true;
+    setStatus('Sending to backend...', true);
 
-    try{
-      const { mainEntity, anchors } = normalizeQuery(raw);
-      const variants = generateNameVariants(mainEntity);
-
-      // canonical checks
-      setStatus('Checking Wikipedia / Wikidata...', true);
-      const [wiki, wikidata] = await Promise.all([ fetchWikipediaSummary(mainEntity), fetchWikidataFacts(mainEntity) ]);
-
-      // discovery
-      setStatus('Discovering authoritative sources...', true);
-      let links = await discoverLinks(variants, anchors);
-      if (links.length < 6){
-        // fallback to GNews
-        const gnews = await fetchGNews(`${mainEntity} ${anchors.join(' ')}`.trim());
-        links = Array.from(new Map([...links, ...gnews].map(i=>[i.link||i.title, i])).values()).slice(0,25);
-      }
-
-      setStatus('Harvesting page contents (best-effort)...', true);
-      const pages = await harvestContents(links);
-      if (pages.length === 0) {
-        setStatus('No pages could be fetched (CORS or no results). Attempting summary-only flow...', true);
-      }
-
-      setStatus('Scoring & filtering relevance...', true);
-      const relevantPages = filterRelevantPages(pages, anchors, 2);
-
-      // disambiguation check
-      const coll = checkCollisions(relevantPages, mainEntity);
-      if (coll.collision){
-        // Ask user briefly to disambiguate
-        setStatus('Multiple possible people match this name — please add a disambiguator (city, org, or program) and try again.');
-        generateBtn.disabled = false;
-        return;
-      }
-
-      setStatus('Extracting candidate facts...', true);
-      const rawFacts = extractCandidates(relevantPages, mainEntity);
-
-      setStatus('Cross-checking & consolidating facts...', true);
-      const merged = crossCheckFacts(rawFacts);
-
-      setStatus('Applying timeliness rules...', true);
-      const timely = filterByTimeliness(merged, 4);
-
-      // sort by corroboration then recency
-      timely.sort((a,b)=>{
-        if (b.corroborationCount !== a.corroborationCount) return b.corroborationCount - a.corroborationCount;
-        const da = a.latestDate ? new Date(a.latestDate).getTime() : 0;
-        const db = b.latestDate ? new Date(b.latestDate).getTime() : 0;
-        return db - da;
+    try {
+      const res = await fetch(WORKER_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q })
       });
 
-      const vettedFacts = timely.slice(0, 30);
-      // optionally include wiki as low priority if exact match
-      if (wiki && (wiki.title||'').toLowerCase() === mainEntity.toLowerCase()){
-        vettedFacts.push({ text: wiki.text, sources:[{ url: wiki.url, title: wiki.title, date:null }], corroborationCount:1, tags:['general'], latestDate:null });
-      }
-
-      setStatus('Preparing synthesis prompt for Gemini...', true);
-      const payload = buildGeminiPayload(raw, mainEntity, relevantPages, vettedFacts);
-
-      setStatus('Requesting Gemini to synthesize report...', true);
-
-      const gres = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!gres.ok){
-        const txt = await gres.text();
-        logError('Gemini API error: ' + txt);
-        setStatus('Error from Gemini API.');
-        generateBtn.disabled = false;
+      if (!res.ok) {
+        const txt = await res.text();
+        showError('Backend error: ' + txt);
+        setStatus('Error');
+        btn.disabled = false;
         return;
       }
 
-      const gjson = await gres.json();
-      const out = getFirstText(gjson);
-      if (!out){
-        logError('Empty output from Gemini.');
-        setStatus('Gemini returned empty result.');
-        generateBtn.disabled = false;
+      const j = await res.json();
+      if (j.error) {
+        showError('Worker: ' + (j.error || JSON.stringify(j)));
+        setStatus('Error');
+        btn.disabled = false;
         return;
       }
 
-      // strip triple-backticks if present, ensure it's a full HTML doc
-      const htmlRaw = String(out).replace(/^\s*```(?:html)?/i,'').replace(/```$/i,'').trim();
+      const html = j.reportHtml || '';
+      if (!html) {
+        showError('No report returned');
+        setStatus('Error');
+        btn.disabled = false;
+        return;
+      }
 
-      // open in new tab as a blob to avoid running inline external loads from caller page
-      const blob = new Blob([htmlRaw], { type:'text/html' });
+      // open report in new tab via Blob (avoid executing in same page)
+      const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
 
-      setStatus('Report opened in a new tab.');
-    }catch(err){
-      logError(err.stack || err || 'Unknown error');
+      setStatus('Report opened in new tab.');
+    } catch (err) {
+      showError('Fetch error: ' + (err.message || err));
       setStatus('Error');
-    }finally{
-      generateBtn.disabled = false;
+    } finally {
+      btn.disabled = false;
     }
   }
 
-  // wire up
-  generateBtn.addEventListener('click', generate);
-  queryEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter' && (e.ctrlKey||e.metaKey)) generate(); });
-
-  // quick note if keys missing
-  (function checkKeys(){
-    const missing = [];
-    if (!GEMINI_API_KEY || GEMINI_API_KEY.includes('YOUR_')) missing.push('Gemini API key');
-    if (!GOOGLE_API_KEY || GOOGLE_API_KEY.includes('YOUR_')) missing.push('Google Custom Search API key (GOOGLE_API_KEY)');
-    if (!GOOGLE_CX || GOOGLE_CX.includes('YOUR_')) missing.push('Google Custom Search CX (GOOGLE_CX)');
-    if (missing.length){
-      logError('⚠️ Please replace placeholder API keys in the script for production: ' + missing.join(', '));
-      setStatus('Keys missing or placeholders present — replace keys in the script.');
-    }
-  })();
-
-  </script>
+  btn.addEventListener('click', generate);
+  qEl.addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) generate(); });
+</script>
 </body>
 </html>
