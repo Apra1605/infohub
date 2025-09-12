@@ -9,6 +9,7 @@
     #output { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
     .error { color: red; }
     .loading { color: gray; }
+    h1 { color: #333; }
   </style>
 </head>
 <body>
@@ -17,6 +18,67 @@
   <button onclick="generate()">Search</button>
   <div id="output"></div>
 
-  <script src="infohub.js"></script>
+  <script>
+    const WORKER_URL = "https://report.anmol-prash.workers.dev/"; // backend endpoint
+
+    async function generate() {
+      const q = document.getElementById("query").value.trim();
+      const output = document.getElementById("output");
+      output.innerHTML = "";
+
+      if (!q) {
+        output.innerHTML = `<p class="error">❌ Please enter a query.</p>`;
+        return;
+      }
+
+      output.innerHTML = `<p class="loading">⏳ Generating report for "<b>${q}</b>"...</p>`;
+
+      try {
+        // ---- Option A: Use GET (simple & reliable) ----
+        const res = await fetch(`${WORKER_URL}?q=${encodeURIComponent(q)}`, {
+          method: "GET"
+        });
+
+        // ---- Option B: POST with JSON ----
+        // const res = await fetch(WORKER_URL, {
+        //   method: "POST",
+        //   headers: { "Content-Type": "application/json" },
+        //   body: JSON.stringify({ query: q })
+        // });
+
+        let data;
+        try {
+          data = await res.json();
+        } catch (e) {
+          throw new Error("Invalid JSON response from backend");
+        }
+
+        if (!res.ok) {
+          output.innerHTML = `<p class="error">❌ Error: ${data.error || "Unknown error"}</p>`;
+          console.error("Backend error:", data);
+          return;
+        }
+
+        // Display the report and sources
+        let html = `<h2>Report for: ${data.query}</h2>`;
+        if (data.report) {
+          html += `<div>${data.report}</div>`;
+        }
+        if (data.sources && data.sources.length > 0) {
+          html += `<h3>Sources</h3><ul>`;
+          for (const s of data.sources) {
+            html += `<li>[${s.id}] <a href="${s.link}" target="_blank">${s.title}</a></li>`;
+          }
+          html += `</ul>`;
+        }
+
+        output.innerHTML = html;
+
+      } catch (err) {
+        console.error("Frontend error:", err);
+        output.innerHTML = `<p class="error">❌ Request failed: ${err.message}</p>`;
+      }
+    }
+  </script>
 </body>
 </html>
