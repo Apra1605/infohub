@@ -1,120 +1,22 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Universal Background Report (Front)</title>
-<style>
-  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#0b1220;color:#eef2ff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
-  .card{width:100%;max-width:900px;padding:20px;border-radius:12px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));box-shadow:0 12px 40px rgba(2,6,23,0.6)}
-  input{width:100%;padding:12px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
-  button{padding:10px 14px;background:#fbbf24;border:none;border-radius:10px;color:#111;font-weight:700;cursor:pointer;margin-top:10px}
-  .status{margin-top:12px;color:#9ca3af}
-  pre.error{margin-top:10px;background:rgba(200,0,0,0.12);color:#ffb4b4;padding:10px;border-radius:8px;display:none}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>InfoHub</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    #output { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+    .error { color: red; }
+    .loading { color: gray; }
+  </style>
 </head>
 <body>
-  <div class="card">
-    <h2>Universal Background Report</h2>
-    <input id="query" placeholder='Enter "Justin Priddy -- Gateway Middle School"' />
-    <div style="display:flex;gap:8px;align-items:center">
-      <button id="go">Generate</button>
-      <div class="status" id="status">Ready</div>
-    </div>
-    <pre id="errorLog" class="error"></pre>
-  </div>
+  <h1>InfoHub</h1>
+  <input id="query" type="text" placeholder="Enter a name, org, or topic" size="40" />
+  <button onclick="generate()">Search</button>
+  <div id="output"></div>
 
-<script>
-  const WORKER_ENDPOINT = "https://report.anmol-prash.workers.dev/"; // <- REPLACE with your deployed Worker URL
-
-  const qEl = document.getElementById('query');
-  const btn = document.getElementById('go');
-  const status = document.getElementById('status');
-  const errorLog = document.getElementById('errorLog');
-
-  function setStatus(text, busy=false){
-    status.textContent = text;
-    if (busy) {
-      const loader = document.createElement('span');
-      loader.style.display='inline-block';
-      loader.style.width='14px';
-      loader.style.height='14px';
-      loader.style.marginLeft='8px';
-      loader.style.border='2px solid rgba(255,255,255,0.15)';
-      loader.style.borderTopColor='#fbbf24';
-      loader.style.borderRadius='50%';
-      loader.style.animation='spin 0.9s linear infinite';
-      loader.className='__ldr';
-      status.appendChild(loader);
-      // add keyframes programmatically
-      const style = document.createElement('style');
-      style.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
-      document.head.appendChild(style);
-    } else {
-      const l = status.querySelector('.__ldr');
-      if (l) l.remove();
-    }
-  }
-
-  function showError(msg){
-    errorLog.style.display='block';
-    errorLog.textContent = (errorLog.textContent ? errorLog.textContent + '\n' : '') + msg;
-  }
-
-  async function generate(){
-    errorLog.style.display='none'; errorLog.textContent='';
-    const q = (qEl.value||'').trim();
-    if (!q) { setStatus('Enter a query.'); return; }
-    btn.disabled = true;
-    setStatus('Sending to backend...', true);
-
-    try {
-      const res = await fetch(WORKER_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q })
-      });
-
-      if (!res.ok) {
-        const txt = await res.text();
-        showError('Backend error: ' + txt);
-        setStatus('Error');
-        btn.disabled = false;
-        return;
-      }
-
-      const j = await res.json();
-      if (j.error) {
-        showError('Worker: ' + (j.error || JSON.stringify(j)));
-        setStatus('Error');
-        btn.disabled = false;
-        return;
-      }
-
-      const html = j.reportHtml || '';
-      if (!html) {
-        showError('No report returned');
-        setStatus('Error');
-        btn.disabled = false;
-        return;
-      }
-
-      // open report in new tab via Blob (avoid executing in same page)
-      const blob = new Blob([html], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-
-      setStatus('Report opened in new tab.');
-    } catch (err) {
-      showError('Fetch error: ' + (err.message || err));
-      setStatus('Error');
-    } finally {
-      btn.disabled = false;
-    }
-  }
-
-  btn.addEventListener('click', generate);
-  qEl.addEventListener('keydown', (e)=>{ if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) generate(); });
-</script>
+  <script src="infohub.js"></script>
 </body>
 </html>
