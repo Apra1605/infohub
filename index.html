@@ -3,82 +3,251 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>InfoHub</title>
+  <title>InfoHub Astral Report</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    #output { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
-    .error { color: red; }
-    .loading { color: gray; }
-    h1 { color: #333; }
+    /* Astral purple / space themed */
+    :root {
+      --bg-primary: #1a0536;
+      --bg-secondary: #2e0a5e;
+      --accent: #be5fff;
+      --muted: #aaaaff;
+      --text-main: #e0d7ff;
+      --text-light: #ffffff;
+      --error-color: #ff6b6b;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text-main);
+      background: radial-gradient(circle at top left, var(--bg-primary), var(--bg-secondary) 80%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .container {
+      background: rgba(30, 5, 56, 0.85);
+      border: 1px solid rgba(190, 95, 255, 0.3);
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(190, 95, 255, 0.5);
+      padding: 30px;
+      width: 90%;
+      max-width: 800px;
+      backdrop-filter: blur(5px);
+    }
+
+    .title {
+      text-align: center;
+      font-size: 2rem;
+      margin-bottom: 20px;
+      color: var(--accent);
+      text-shadow: 0 0 10px var(--accent);
+    }
+
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .input-group input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--muted);
+      background: rgba(50, 15, 90, 0.8);
+      color: var(--text-light);
+      font-size: 1rem;
+      outline: none;
+    }
+
+    .input-group input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .input-group button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      background: var(--accent);
+      color: var(--text-primary, #1a0536);
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.3s, transform 0.2s;
+    }
+
+    .input-group button:hover {
+      background: #a84fff;
+      transform: scale(1.05);
+    }
+
+    .status {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    .error {
+      color: var(--error-color);
+      margin-top: 15px;
+      text-align: center;
+    }
+
+    #report, #sources {
+      margin-top: 20px;
+      background: rgba(60, 20, 120, 0.6);
+      padding: 20px;
+      border-radius: 8px;
+    }
+
+    #report {
+      color: var(--text-light);
+    }
+
+    #sources ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    #sources li {
+      margin-bottom: 8px;
+      color: var(--muted);
+    }
+    #sources a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    #sources a:hover {
+      text-decoration: underline;
+    }
+
+    /* Moving stars / subtle background animation */
+    .stars {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 200%;
+      height: 200%;
+      background: url('https://cdn.pixabay.com/photo/2020/07/07/09/56/stars-5376820_960_720.png') repeat;
+      background-size: cover;
+      animation: drift 200s linear infinite;
+      opacity: 0.2;
+      pointer-events: none;
+      z-index: -1;
+    }
+    @keyframes drift {
+      from { transform: translate(0,0); }
+      to { transform: translate(-50%, -50%); }
+    }
   </style>
 </head>
 <body>
-  <h1>InfoHub</h1>
-  <input id="query" type="text" placeholder="Enter a name, org, or topic" size="40" />
-  <button onclick="generate()">Search</button>
-  <div id="output"></div>
+  <div class="stars"></div>
+  <div class="container">
+    <div class="title">InfoHub Astral Report</div>
+    <div class="input-group">
+      <input id="query" type="text" placeholder="Enter a name, org, or topic" />
+      <button id="runBtn">Generate</button>
+    </div>
+    <div class="status" id="status">Enter query to begin.</div>
+    <div id="report"></div>
+    <div id="sources"></div>
+  </div>
 
   <script>
-    const WORKER_URL = "https://report.anmol-prash.workers.dev/"; // backend endpoint
+    const WORKER_URL = "https://report.anmol-prash.workers.dev/";
+    const statusEl = document.getElementById("status");
+    const reportEl = document.getElementById("report");
+    const sourcesEl = document.getElementById("sources");
+    const runBtn = document.getElementById("runBtn");
+    const inputEl = document.getElementById("query");
+
+    function setStatus(msg, isLoading = false) {
+      statusEl.textContent = msg;
+      if (isLoading) {
+        statusEl.style.color = "#aaaaff";
+      } else {
+        statusEl.style.color = "var(--muted)";
+      }
+    }
 
     async function generate() {
-      const q = document.getElementById("query").value.trim();
-      const output = document.getElementById("output");
-      output.innerHTML = "";
-
+      const q = inputEl.value.trim();
+      reportEl.innerHTML = "";
+      sourcesEl.innerHTML = "";
       if (!q) {
-        output.innerHTML = `<p class="error">❌ Please enter a query.</p>`;
+        setStatus("❌ Please enter a query.");
         return;
       }
 
-      output.innerHTML = `<p class="loading">⏳ Generating report for "<b>${q}</b>"...</p>`;
+      setStatus(`⏳ Generating report for "${q}"...`, true);
+      runBtn.disabled = true;
 
       try {
-        // ---- Option A: Use GET (simple & reliable) ----
-        const res = await fetch(`${WORKER_URL}?q=${encodeURIComponent(q)}`, {
-          method: "GET"
+        const response = await fetch(`${WORKER_URL}?q=${encodeURIComponent(q)}`, {
+          method: "GET",
+          mode: "cors",
+          credentials: "omit"   // change to "include" if needed and backend supports credentials
         });
 
-        // ---- Option B: POST with JSON ----
-        // const res = await fetch(WORKER_URL, {
-        //   method: "POST",
-        //   headers: { "Content-Type": "application/json" },
-        //   body: JSON.stringify({ query: q })
-        // });
+        console.log("Response Status:", response.status);
+        console.log("Response Headers:", Array.from(response.headers.entries()));
 
-        let data;
-        try {
-          data = await res.json();
-        } catch (e) {
-          throw new Error("Invalid JSON response from backend");
+        const data = await response.json().catch(e => {
+          throw new Error("Backend returned invalid JSON: " + (e.message || e));
+        });
+
+        if (!response.ok) {
+          throw new Error(data.error || `Server responded with ${response.status}`);
         }
 
-        if (!res.ok) {
-          output.innerHTML = `<p class="error">❌ Error: ${data.error || "Unknown error"}</p>`;
-          console.error("Backend error:", data);
-          return;
+        // Show report HTML block
+        if (data.reportHtml) {
+          reportEl.innerHTML = data.reportHtml;
+        } else if (data.report) {
+          reportEl.innerHTML = `<p>${data.report}</p>`;
+        } else {
+          reportEl.innerHTML = `<p>No report content.</p>`;
         }
 
-        // Display the report and sources
-        let html = `<h2>Report for: ${data.query}</h2>`;
-        if (data.report) {
-          html += `<div>${data.report}</div>`;
-        }
-        if (data.sources && data.sources.length > 0) {
-          html += `<h3>Sources</h3><ul>`;
-          for (const s of data.sources) {
-            html += `<li>[${s.id}] <a href="${s.link}" target="_blank">${s.title}</a></li>`;
-          }
-          html += `</ul>`;
+        // Show sources
+        if (data.sources && Array.isArray(data.sources) && data.sources.length > 0) {
+          let list = "<h3>Sources</h3><ul>";
+          data.sources.forEach(s => {
+            if (s.link) {
+              list += `<li>[${s.id}] <a href="${s.link}" target="_blank">${s.title}</a> ${s.score !== undefined ? `(score ${s.score})` : ''}</li>`;
+            } else {
+              list += `<li>[${s.id}] ${s.title} (no link) ${s.score !== undefined ? `(score ${s.score})` : ''}</li>`;
+            }
+          });
+          list += "</ul>";
+          sourcesEl.innerHTML = list;
+        } else {
+          sourcesEl.innerHTML = `<p class="muted">No sources available.</p>`;
         }
 
-        output.innerHTML = html;
-
+        setStatus("✅ Report generated.");
       } catch (err) {
         console.error("Frontend error:", err);
-        output.innerHTML = `<p class="error">❌ Request failed: ${err.message}</p>`;
+        reportEl.innerHTML = `<p class="error">❌ Request failed: ${err.message}</p>`;
+        setStatus("❌ Error generating report.");
+      } finally {
+        runBtn.disabled = false;
       }
     }
+
+    runBtn.addEventListener("click", generate);
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        generate();
+      }
+    });
   </script>
 </body>
 </html>
